@@ -120,6 +120,9 @@ func BeginService(sInfo *ServerInfo, sCoon *SerConnObj) {
 
 func Transmit(sInfo *ServerInfo, sCoon *SerConnObj) {
 	defer func(s *SerConnObj) {
+		if r := recover(); r != nil {
+			printer.PanicStack(r)
+		}
 		s.Close("Transmit")
 		printer.TextInfo("transmit Goroutine End........")
 	}(sCoon)
