@@ -270,12 +270,12 @@ func DeliveryMsg(gateID int, sessionId uint32, protoName string, data []byte) {
 		printer.TextError("searchRes Is Fail, protoName = " + protoName)
 		return
 	}
+
 	if ServicePrt == nil {
 		printer.TextError("ServicePrt Is Null")
 		return
 	}
-	gateConn := ServicePrt.GetConnObj(gateID)
-	if gateConn != nil {
+	if gateConn := ServicePrt.GetConnObj(gateID); gateConn != nil {
 		dataLen := len(data)
 		msgTotalSize := gateway_server.SessionIdLen + gateway_server.ProtoNumLen + dataLen //数据包结构=[session][协议号][数据内容]
 		sendDataBuf := make([]byte, msgTotalSize)
