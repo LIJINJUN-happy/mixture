@@ -70,6 +70,7 @@ func DoInit(db *sql.DB) bool {
 		printer.TextError("doInit", "whiteIPListDefaultStatus Error", "whiteIPListDefaultStatus", whiteStatus)
 		return false
 	}
+	printer.TextDebug("doInit", "WhiteList Init", "WhiteList Info", *WhiteListPtr)
 
 	GateInfo.curDistributionSessionID = 0
 	GateInfo.rebuildListenSec = 5
