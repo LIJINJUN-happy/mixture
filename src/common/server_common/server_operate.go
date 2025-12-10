@@ -122,6 +122,7 @@ func Transmit(sInfo *ServerInfo, sCoon *SerConnObj) {
 	defer func(s *SerConnObj) {
 		if s.gateSerConn != nil {
 			(*s.gateSerConn).Close()
+			s.gateSerConn = nil
 		}
 		printer.TextInfo("transmit Goroutine End........")
 	}(sCoon)
@@ -130,18 +131,21 @@ func Transmit(sInfo *ServerInfo, sCoon *SerConnObj) {
 	for {
 		select {
 		case transmitData := <-sCoon.sendChannel:
-			if sCoon.gateSerConn == nil {
-				continue
-			}
-			if trueData, conversionResult := transmitData.([]byte); conversionResult {
-				if num := gateway_server.DoPack(dataSlice, trueData, 1); num > 0 {
-					_, writeErr := (*sCoon.gateSerConn).Write(dataSlice[0:num])
-					if writeErr != nil {
-						printer.TextError("DialObject Write Fail", "writeErr", writeErr.Error(), "ServerName", sInfo.ServerName, "ServerId", sInfo.ServerId)
-						return
+			if sCoon.gateSerConn != nil {
+				if trueData, conversionResult := transmitData.([]byte); conversionResult {
+					if num := gateway_server.DoPack(dataSlice, trueData, 1); num > 0 {
+						_, writeErr := (*sCoon.gateSerConn).Write(dataSlice[0:num])
+						if writeErr != nil {
+							printer.TextError("DialObject Write Fail", "writeErr", writeErr.Error(), "ServerName", sInfo.ServerName, "ServerId", sInfo.ServerId)
+							return
+						}
+						//printer.TextDebug("DialObject Write Success ", "writeNum", writeNum, "dataSlice", string(dataSlice[0:writeNum]))
 					}
-					//printer.TextDebug("DialObject Write Success ", "writeNum", writeNum, "dataSlice", string(dataSlice[0:writeNum]))
 				}
+			}
+		case <-time.After(time.Millisecond):
+			if sCoon.gateSerConn == nil {
+				return
 			}
 		}
 	}
@@ -151,7 +155,8 @@ func Dispose(sInfo *ServerInfo, sCoon *SerConnObj) {
 	defer func(s *SerConnObj) {
 		if r := recover(); r != nil {
 			if s.gateSerConn != nil {
-				(*s.gateSerConn).Close() //假如有Panic触发,关闭socket让其他协程退出
+				(*s.gateSerConn).Close()
+				s.gateSerConn = nil
 			}
 			printer.PanicStack(r)
 		}
@@ -200,10 +205,21 @@ func Dispose(sInfo *ServerInfo, sCoon *SerConnObj) {
 					tarSerName = jsStruct.SerName
 				}
 
-				sCoon.SetGateId(gateID) //设置网关标识
-				printer.TextInfo("dispose SYN GateId", "TarSerName", tarSerName, "ID", gateID, "CurGateSize", sInfo.connObjList.Len())
+				//检测一下是否存已存在对应的网关ID标识，不可重复，需要保证唯一ID标识
+				if !sInfo.CheckConnObjIsExist(gateID) {
+					sCoon.SetGateId(gateID) //设置网关标识
+					sInfo.mux.RLock()
+					curGateSize := sInfo.connObjList.Len()
+					sInfo.mux.RUnlock()
+					printer.TextInfo("dispose SYN GateId", "TarSerName", tarSerName, "ID", gateID, "CurGateSize", curGateSize)
+				} else {
+					//否者直接断开连接
+					ptr := sCoon.gateSerConn
+					sCoon.gateSerConn = nil
+					(*ptr).Close()
+					printer.TextError("dispose SYN GateId", "TarSerName", tarSerName, "Already Exist ID", gateID)
+				}
 			}
-
 		case <-time.After(time.Millisecond):
 			//由于dispose协程内无法根据read或者write的报错触发error，只能根据conn是否被设为空来销毁协程
 			if sCoon.gateSerConn == nil {

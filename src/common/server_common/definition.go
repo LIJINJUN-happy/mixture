@@ -22,7 +22,7 @@ type ServerInfo struct {
 	port                int                                //服务进程的接收端口
 	address             string                             //服务进程的接收地址
 	listenObj           *net.Listener                      //监听对象
-	mux                 sync.Mutex                         //链表锁(防止多个协程同时修改connObjList)
+	mux                 sync.RWMutex                       //链表读写锁(防止多个协程同时修改connObjList)
 	connObjList         *list.List                         //用于存放SerConnObj对象指针的链表
 	DisposeFunc         func([]byte, string, int, uint32)  //提供一个接口来处理接收到来的数据,参数：协议数据,协议名字,发送信息过来的gateID,用户的SessionID（可以有可以没有）
 	ServerHandleFuncMap map[string]func(data []byte) error //服务处理函数集
@@ -80,10 +80,12 @@ func (s *ServerInfo) GetAddress() string {
 	return s.address
 }
 
-func (s *ServerInfo) CheckConnObj(c *SerConnObj) bool {
+func (s *ServerInfo) CheckConnObjIsExist(gateId int) bool {
+	s.mux.RLock()
+	defer s.mux.RUnlock() //检测只需要添加读锁即可
 	for iterator := s.connObjList.Front(); iterator != nil; iterator = iterator.Next() {
 		element := iterator.Value.(*SerConnObj)
-		if element.GetGateId() == c.GetGateId() {
+		if element.GetGateId() == gateId {
 			return true
 		}
 	}
@@ -91,6 +93,8 @@ func (s *ServerInfo) CheckConnObj(c *SerConnObj) bool {
 }
 
 func (s *ServerInfo) GetConnObj(gateID int) *SerConnObj {
+	s.mux.RLock()
+	defer s.mux.RUnlock() //获取只需要添加读锁即可
 	for iterator := s.connObjList.Front(); iterator != nil; iterator = iterator.Next() {
 		element := iterator.Value.(*SerConnObj)
 		if element.GetGateId() == gateID {
@@ -102,10 +106,11 @@ func (s *ServerInfo) GetConnObj(gateID int) *SerConnObj {
 
 func (s *ServerInfo) AddConnObj(c *SerConnObj) {
 	remoteIp := (*c.gateSerConn).RemoteAddr().String()
-	printer.TextInfo("AddConnObj New Conn Success", "RemoteAddr", remoteIp, "ServerName", s.ServerName, "ServerId", s.ServerId)
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	s.connObjList.PushBack(c)
+	if s.connObjList.PushBack(c) != nil {
+		printer.TextInfo("AddConnObj New Conn Success", "RemoteAddr", remoteIp, "ServerName", s.ServerName, "ServerId", s.ServerId)
+	}
 }
 
 // DeleteConnObj 移除来自gateWay的连接对象
