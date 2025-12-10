@@ -8,7 +8,6 @@ import (
 	"github.com/gorilla/websocket"
 	"io"
 	"mixture/src/common/printer"
-	"mixture/src/database"
 	"net"
 	"strconv"
 	"strings"
@@ -422,23 +421,4 @@ func CreateReadStreamBufferObject(way int) *ReadStreamBufferObject {
 		byteData:         make([]byte, 0, ReadStreamBufferSize),
 	}
 	return &rsbObject
-}
-
-// 白名单过滤
-func FiltrateWhiteIp(conAddrStr string) bool {
-	if loadWhiteList, ipList := database.GetWhiteIpList(); loadWhiteList == nil {
-		if len(ipList) > 0 {
-			parts := strings.Split(conAddrStr, ":")
-			if len(parts) == 2 {
-				for _, ip := range ipList {
-					if parts[0] == ip {
-						return true
-					}
-				}
-				printer.TextError("FiltrateWhiteIp Fail", "ErrIp", parts[0])
-				return false
-			}
-		}
-	}
-	return true
 }

@@ -3,7 +3,6 @@ package database
 
 import (
 	"database/sql"
-	"errors"
 	_ "github.com/mattn/go-sqlite3"
 	"mixture/src/common/printer"
 	"strconv"
@@ -132,28 +131,4 @@ func GetMongoAddressAndPort(serName, id string, db *sql.DB) (string, string, str
 		return readAddrString, readPortString, writeAddrString, writePortString
 	}
 	return "", "", "", ""
-}
-
-// 加载IP白名单
-func GetWhiteIpList() (error, []string) {
-	var list []string
-	if errCon, db := GetSQLiteConnDB(); errCon == nil {
-		rows, queryErr := db.Query("SELECT ip FROM whiteIpList")
-		if queryErr != nil {
-			return errors.New("db.Query(SELECT ip FROM whiteIpList) Fail With " + queryErr.Error()), list
-		} else {
-			for rows.Next() {
-				var ip string
-				err := rows.Scan(&ip)
-				if err == nil {
-					return errors.New("rows.Scan Fail With GetWhiteIpList"), list
-				} else {
-					list = append(list, ip)
-				}
-			}
-		}
-	} else {
-		return errors.New("GetSQLiteConnDB Fail With GetWhiteIpList: " + errCon.Error()), list
-	}
-	return nil, list
 }

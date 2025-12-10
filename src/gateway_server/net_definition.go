@@ -166,3 +166,40 @@ func (linker *SerLinker) InitLinker(linkerName string, db *sql.DB, linkerID int)
 	linker.address = strBuilder.String()
 	return
 }
+
+// 白名单结构
+type WhiteList struct {
+	whiteMux sync.RWMutex      //使用读写锁,因为绝大部分都是读比较多
+	whiteMap map[string]string //白名单字典
+	IsActive bool              //是否开启
+}
+
+// 白名单指针对象
+var WhiteListPtr = new(WhiteList)
+
+func (w *WhiteList) CheckWhiteIP(addr string) bool {
+	w.whiteMux.RLock()
+	defer w.whiteMux.RUnlock()
+	if _, ok := w.whiteMap[addr]; ok {
+		return true
+	}
+	return false
+}
+
+func (w *WhiteList) AddWhiteIP(addr string) {
+	w.whiteMux.Lock()
+	defer w.whiteMux.Unlock()
+	w.whiteMap[addr] = addr
+}
+
+func (w *WhiteList) DelWhiteIP(addr string) {
+	w.whiteMux.Lock()
+	defer w.whiteMux.Unlock()
+	delete(w.whiteMap, addr)
+}
+
+func (w *WhiteList) ChangeActiveStatus(cmd bool) {
+	w.whiteMux.Lock()
+	defer w.whiteMux.Unlock()
+	w.IsActive = cmd
+}

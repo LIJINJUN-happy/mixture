@@ -45,7 +45,6 @@ func Run() {
 	Looping()
 }
 
-// DoInit for the net config
 func DoInit(db *sql.DB) bool {
 	defer func(sq *sql.DB) {
 		closeError := sq.Close() //调用db.Close() 函数关闭数据库
@@ -53,6 +52,24 @@ func DoInit(db *sql.DB) bool {
 			printer.TextError("doInit", "SqlLite Database Close Failed", closeError)
 		}
 	}(db)
+
+	//白名单初始化逻辑
+	WhiteListPtr.whiteMux.Lock()
+	WhiteListPtr.whiteMap = make(map[string]string)
+	WhiteListPtr.whiteMux.Unlock()
+	if ipListStr := tools.GetSysValueByKey("whiteIPList"); len(ipListStr) > 0 {
+		for _, ip := range strings.Split(ipListStr, "|") {
+			WhiteListPtr.AddWhiteIP(ip) //加载IP白名单列表
+		}
+	}
+	if whiteStatus := tools.GetSysValueByKey("whiteIPListDefaultStatus"); (whiteStatus == "true") || (whiteStatus == "false") {
+		if whiteStatus == "true" {
+			WhiteListPtr.IsActive = true
+		}
+	} else {
+		printer.TextError("doInit", "whiteIPListDefaultStatus Error", "whiteIPListDefaultStatus", whiteStatus)
+		return false
+	}
 
 	GateInfo.curDistributionSessionID = 0
 	GateInfo.rebuildListenSec = 5
@@ -327,4 +344,12 @@ func SendGateIDToRemoteSer(cn *net.Conn, linkerName string) {
 	num := DoPack(dataSlice, body, 1)
 	n, _ := (*cn).Write(dataSlice[:num])
 	printer.TextInfo("sendGateIpToRemoteSer", "sendNum", n, ",sendDataSlice", string(dataSlice[:num]), ", LinkerAddress", (*cn).RemoteAddr().String(), "BodySize", cpSize, "linkerName", linkerName)
+}
+
+// 白名单过滤
+func FiltrateWhiteIp(conAddrStr string) bool {
+	if !WhiteListPtr.IsActive {
+		return true //假如没开启白名单则直接默认返回true即可,无需检测
+	}
+	return WhiteListPtr.CheckWhiteIP(conAddrStr)
 }
