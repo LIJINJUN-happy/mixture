@@ -275,14 +275,12 @@ func DeliveryMsg(gateID int, sessionId uint32, protoName string, data []byte) {
 		printer.TextError("ServicePrt Is Null")
 		return
 	}
-	if gateConn := ServicePrt.GetConnObj(gateID); gateConn != nil {
-		dataLen := len(data)
+	if gateConn, dataLen := ServicePrt.GetConnObj(gateID), len(data); gateConn != nil {
 		msgTotalSize := gateway_server.SessionIdLen + gateway_server.ProtoNumLen + dataLen //数据包结构=[session][协议号][数据内容]
 		sendDataBuf := make([]byte, msgTotalSize)
 		binary.BigEndian.PutUint32(sendDataBuf[:gateway_server.SessionIdLen], sessionId)
 		binary.BigEndian.PutUint16(sendDataBuf[gateway_server.SessionIdLen:gateway_server.SessionIdLen+gateway_server.ProtoNumLen], protoNum)
-		n := copy(sendDataBuf[gateway_server.SessionIdLen+gateway_server.ProtoNumLen:], data)
-		if n == dataLen {
+		if n := copy(sendDataBuf[gateway_server.SessionIdLen+gateway_server.ProtoNumLen:], data); n == dataLen {
 			gateConn.GetSendChannel() <- sendDataBuf
 		} else {
 			printer.TextError("copy sendDataBuf Not Same, copy result size = "+strconv.Itoa(n)+" dataLen =", strconv.Itoa(dataLen))
