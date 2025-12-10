@@ -169,8 +169,8 @@ func (linker *SerLinker) InitLinker(linkerName string, db *sql.DB, linkerID int)
 
 // 白名单结构
 type WhiteList struct {
-	whiteMux sync.RWMutex      //使用读写锁,因为绝大部分都是读比较多
-	whiteMap map[string]string //白名单字典
+	WhiteMux sync.RWMutex      //使用读写锁,因为绝大部分都是读比较多
+	WhiteMap map[string]string //白名单字典
 	IsActive bool              //是否开启
 }
 
@@ -178,28 +178,28 @@ type WhiteList struct {
 var WhiteListPtr = new(WhiteList)
 
 func (w *WhiteList) CheckWhiteIP(addr string) bool {
-	w.whiteMux.RLock()
-	defer w.whiteMux.RUnlock()
-	if _, ok := w.whiteMap[addr]; ok {
+	w.WhiteMux.RLock()
+	defer w.WhiteMux.RUnlock()
+	if _, ok := w.WhiteMap[addr]; ok {
 		return true
 	}
 	return false
 }
 
 func (w *WhiteList) AddWhiteIP(addr string) {
-	w.whiteMux.Lock()
-	defer w.whiteMux.Unlock()
-	w.whiteMap[addr] = addr
+	w.WhiteMux.Lock()
+	defer w.WhiteMux.Unlock()
+	w.WhiteMap[addr] = addr
 }
 
 func (w *WhiteList) DelWhiteIP(addr string) {
-	w.whiteMux.Lock()
-	defer w.whiteMux.Unlock()
-	delete(w.whiteMap, addr)
+	w.WhiteMux.Lock()
+	defer w.WhiteMux.Unlock()
+	delete(w.WhiteMap, addr)
 }
 
 func (w *WhiteList) ChangeActiveStatus(cmd bool) {
-	w.whiteMux.Lock()
-	defer w.whiteMux.Unlock()
+	w.WhiteMux.Lock()
+	defer w.WhiteMux.Unlock()
 	w.IsActive = cmd
 }

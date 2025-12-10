@@ -54,9 +54,9 @@ func DoInit(db *sql.DB) bool {
 	}(db)
 
 	//白名单初始化逻辑
-	WhiteListPtr.whiteMux.Lock()
-	WhiteListPtr.whiteMap = make(map[string]string)
-	WhiteListPtr.whiteMux.Unlock()
+	WhiteListPtr.WhiteMux.Lock()
+	WhiteListPtr.WhiteMap = make(map[string]string)
+	WhiteListPtr.WhiteMux.Unlock()
 	if ipListStr := tools.GetSysValueByKey("whiteIPList"); len(ipListStr) > 0 {
 		for _, ip := range strings.Split(ipListStr, "|") {
 			WhiteListPtr.AddWhiteIP(ip) //加载IP白名单列表
