@@ -1,0 +1,8 @@
+syntax="proto3";
+package element;
+option go_package = "/ipb";
+
+message GateIdSyncInfo{
+  string ser_name = 1;
+  int32 gate_id = 2;
+}

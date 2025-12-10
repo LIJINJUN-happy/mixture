@@ -1,0 +1,21 @@
+syntax="proto3";
+package hotfix_settings;
+option go_package = "/ipb";
+
+//内部转发到modularized热更新配置
+message S2SHotFixModularizedSerSettings{
+  bool HotFixAll=1;       //是否热更全部
+  string SettingsInfo=2;  //单个热更的配置信息
+}
+
+//内部转发到interactive热更新配置
+message S2SHotFixInteractiveSerSettings{
+  bool HotFixAll=1;
+  string SettingsInfo=2;
+}
+
+//内部转发到Web热更新配置
+message S2SHotFixWebSerSettings{
+  bool HotFixAll=1;
+  string SettingsInfo=2;
+}

@@ -1,0 +1,18 @@
+{
+	"Const": {
+		"HeroInitList": [
+			1,
+			2,
+			3
+		],
+		"EquipmentInitList": [
+			11,
+			22,
+			33
+		]
+	},
+	"Currency": {
+		"Gold": 1,
+		"Diamond": 2
+	}
+}

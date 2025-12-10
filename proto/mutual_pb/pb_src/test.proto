@@ -1,0 +1,13 @@
+syntax="proto3";
+package test;
+option go_package = "/pb";
+
+//测试客户端发送给服务器
+message C2STest{
+  int32 num =1;
+}
+
+//测试服务器协议返回给客户端
+message S2CTestRet{
+  int32 num =1;
+}

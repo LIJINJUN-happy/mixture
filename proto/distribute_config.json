@@ -1,0 +1,36 @@
+{
+  "CS_actor_server": [
+    "C2STest"
+  ],
+
+  "CS_modularized_server": [
+  ],
+
+  "CS_interactive_server": [
+  ],
+
+  "CS_gateway_server": [
+    "S2CTestRet"
+  ],
+
+  "CS_web_server": [
+  ],
+
+  "SS_actor_server": [
+  ],
+
+  "SS_modularized_server": [
+    "S2SHotFixModularizedSerSettings"
+  ],
+
+  "SS_interactive_server": [
+    "S2SHotFixInteractiveSerSettings"
+  ],
+
+  "SS_web_server": [
+    "S2SHotFixWebSerSettings"
+  ],
+
+  "SS_gateway_server": [
+  ]
+}

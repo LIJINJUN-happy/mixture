@@ -1,0 +1,14 @@
+--是否打开pprof调试模式
+pprof=true
+
+--日志等级设置（默认为Info等级,内网调试可以设为Debug等级）
+slogLevel=0
+
+--网络模式（TCP连接还是WebSock连接模式，参数分别是tcp或者是ws）
+workMode=tcp
+
+--协议类型（分别是protobuf或者是json格式）
+protocolType=protobuf
+
+--mongo账号密码
+mongoPassword=
