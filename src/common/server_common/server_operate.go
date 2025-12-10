@@ -267,7 +267,7 @@ func (s *ServerInfo) TryCallServerFunc(data []byte, proName string) {
 func DeliveryMsg(gateID int, sessionId uint32, protoName string, data []byte) {
 	protoNum, searchRes := gateway_server.ProtocolDistributeInfo.ProtoNameMap[protoName]
 	if !searchRes {
-		printer.TextError("searchRes Is Fail, protoName = " + protoName)
+		printer.TextError("ProtoNameMap Search Fail", "protoName", protoName)
 		return
 	}
 
@@ -287,6 +287,6 @@ func DeliveryMsg(gateID int, sessionId uint32, protoName string, data []byte) {
 			sendDataBuf = nil
 		}
 	} else {
-		printer.TextError("GetConnObj Fail, gateID:", strconv.Itoa(gateID))
+		printer.TextError("GetConnObj Fail", "GateID", gateID)
 	}
 }
