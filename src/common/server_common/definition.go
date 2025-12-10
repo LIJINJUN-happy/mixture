@@ -133,7 +133,7 @@ func (s *ServerInfo) DeleteConnObj(gateId int) {
 				element.gateSerConn = nil
 			}
 			s.connObjList.Remove(iterator)
-			printer.TextInfo("DeleteConnObj Success", "RemoteGateId", gateId, "ServerName", s.ServerName, "ServerId", s.ServerId)
+			printer.TextInfo("DeleteConnObj Success", "RemoteGateId", gateId, "ServerName", s.ServerName, "ServerId", s.ServerId, "After DeleteConnObj Size", s.connObjList.Len())
 		}
 	}
 }
