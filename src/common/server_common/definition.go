@@ -125,13 +125,7 @@ func (s *ServerInfo) DeleteConnObj(gateId int) {
 			close(element.receiveChannel)
 
 			//关闭socket, 并从连接链中移除连接对象
-			if element.gateSerConn != nil {
-				closeError := (*element.gateSerConn).Close()
-				if closeError != nil {
-					printer.TextError("gateSerConn Close Fail With DeleteConnObj", "Close Error", closeError.Error())
-				}
-				element.gateSerConn = nil
-			}
+			element.Close("DeleteConnObj")
 			s.connObjList.Remove(iterator)
 			printer.TextInfo("DeleteConnObj Success", "RemoteGateId", gateId, "ServerName", s.ServerName, "ServerId", s.ServerId, "After DeleteConnObj Size", s.connObjList.Len())
 		}
@@ -183,4 +177,13 @@ func (s *SerConnObj) GetReceiveChannel() chan any {
 
 func (s *SerConnObj) GetGateSerConn() *net.Conn {
 	return s.gateSerConn
+}
+
+func (s *SerConnObj) Close(funcCmd string) {
+	if s.gateSerConn != nil {
+		if closeError := (*s.gateSerConn).Close(); closeError != nil {
+			printer.TextError("gateSerConn Close Fail", "Close Error", closeError.Error(), "funcCmd", funcCmd)
+		}
+		s.gateSerConn = nil
+	}
 }

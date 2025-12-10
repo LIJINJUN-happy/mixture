@@ -120,10 +120,7 @@ func BeginService(sInfo *ServerInfo, sCoon *SerConnObj) {
 
 func Transmit(sInfo *ServerInfo, sCoon *SerConnObj) {
 	defer func(s *SerConnObj) {
-		if s.gateSerConn != nil {
-			(*s.gateSerConn).Close()
-			s.gateSerConn = nil
-		}
+		s.Close("Transmit")
 		printer.TextInfo("transmit Goroutine End........")
 	}(sCoon)
 
@@ -154,12 +151,9 @@ func Transmit(sInfo *ServerInfo, sCoon *SerConnObj) {
 func Dispose(sInfo *ServerInfo, sCoon *SerConnObj) {
 	defer func(s *SerConnObj) {
 		if r := recover(); r != nil {
-			if s.gateSerConn != nil {
-				(*s.gateSerConn).Close()
-				s.gateSerConn = nil
-			}
 			printer.PanicStack(r)
 		}
+		s.Close("Dispose")
 		printer.TextInfo("dispose Goroutine End........")
 	}(sCoon)
 
