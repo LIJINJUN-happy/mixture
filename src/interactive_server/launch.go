@@ -32,7 +32,11 @@ func interactiveSerProcessor(data []byte, proName string, gateId int, sessionID 
 	pbData := ipb.S2SHotFixWebSerSettings{HotFixAll: false, SettingsInfo: "./settings/const_cfg.json"}
 	sendData, mRes := proto.Marshal(&pbData)
 	if mRes == nil {
-		server_common.DeliveryMsg(gateId, sessionID, "S2SHotFixWebSerSettings", sendData)
+		if gateId == 1 {
+			server_common.DeliveryMsg(2, sessionID, "S2SHotFixWebSerSettings", sendData)
+		} else {
+			server_common.DeliveryMsg(1, sessionID, "S2SHotFixWebSerSettings", sendData)
+		}
 	}
 
 }
