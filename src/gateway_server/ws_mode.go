@@ -37,7 +37,9 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 		printer.TextError("Failed To Set up WebSocket Connection", "errUpgrade", errUpgrade)
 		return
 	}
-	if !FiltrateWhiteIp(wsConn.RemoteAddr().String()) {
+
+	//白名单过滤
+	if !WhiteListPtr.CheckWhiteIP(wsConn.RemoteAddr().String()) {
 		wsConn.Close()
 		return
 	}

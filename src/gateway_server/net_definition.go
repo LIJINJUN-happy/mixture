@@ -180,6 +180,10 @@ var WhiteListPtr = new(WhiteList)
 func (w *WhiteList) CheckWhiteIP(addr string) bool {
 	w.WhiteMux.RLock()
 	defer w.WhiteMux.RUnlock()
+	if !w.IsActive {
+		return true //假如没开启白名单则直接默认返回true即可,无需检测
+	}
+
 	if _, ok := w.WhiteMap[addr]; ok {
 		return true
 	}

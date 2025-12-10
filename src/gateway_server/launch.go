@@ -345,11 +345,3 @@ func SendGateIDToRemoteSer(cn *net.Conn, linkerName string) {
 	n, _ := (*cn).Write(dataSlice[:num])
 	printer.TextInfo("sendGateIpToRemoteSer", "sendNum", n, ",sendDataSlice", string(dataSlice[:num]), ", LinkerAddress", (*cn).RemoteAddr().String(), "BodySize", cpSize, "linkerName", linkerName)
 }
-
-// 白名单过滤
-func FiltrateWhiteIp(conAddrStr string) bool {
-	if !WhiteListPtr.IsActive {
-		return true //假如没开启白名单则直接默认返回true即可,无需检测
-	}
-	return WhiteListPtr.CheckWhiteIP(conAddrStr)
-}

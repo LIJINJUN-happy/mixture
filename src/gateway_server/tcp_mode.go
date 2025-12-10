@@ -34,7 +34,8 @@ func BeginTcpSer() {
 		if acceptErr != nil {
 			printer.TextError("Accept Connect Error", "acceptErr", acceptErr.Error())
 		} else {
-			if !FiltrateWhiteIp(conn.RemoteAddr().String()) {
+			//白名单过滤
+			if !WhiteListPtr.CheckWhiteIP(conn.RemoteAddr().String()) {
 				conn.Close()
 				continue
 			}
