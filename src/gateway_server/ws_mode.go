@@ -46,7 +46,7 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 
 	printer.TextInfo("Upgraded WebSocket Connection Successfully")
 	newConn := CreateNewConnObject(1, nil, wsConn, "ws")
-	(*clientReadGoroutineNum).Add(1)
+	clientReadGoroutineNum.Add(1)
 	AddClientToGateMap(newConn, newConn.writeChan)
 
 	defer func(wsc *NewConnection) {
@@ -55,7 +55,7 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 		if closeError != nil {
 			printer.TextError("Failed To Close WsConn", "closeError", closeError)
 		}
-		(*clientReadGoroutineNum).Add(-1)
+		clientReadGoroutineNum.Add(-1)
 	}(newConn)
 
 	//Do Write

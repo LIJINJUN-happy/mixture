@@ -305,7 +305,7 @@ func Looping() {
 			default:
 			}
 		case <-time.After(intervalLoopingTime):
-			printer.TextInfo("ClientGoroutine Statistics", "Read-Goroutine", (*clientReadGoroutineNum).Load(), "Write-Goroutine", (*clientWriteGoroutineNum).Load())
+			printer.TextInfo("ClientGoroutine Statistics", "Read-Goroutine", clientReadGoroutineNum.Load(), "Write-Goroutine", clientWriteGoroutineNum.Load())
 		}
 	}
 }

@@ -41,7 +41,7 @@ func BeginTcpSer() {
 			}
 
 			printer.TextDebug("Accept Connect Success", "conn", conn)
-			nowCount := (*clientReadGoroutineNum).Load()
+			nowCount := clientReadGoroutineNum.Load()
 			if nowCount >= GateInfo.maxConnSize {
 				closeError := conn.Close()
 				if closeError != nil {
@@ -68,13 +68,13 @@ func DealConnect(newConn *NewConnection) {
 }
 
 func DoWriteMsg(newConn *NewConnection) {
-	(*clientWriteGoroutineNum).Add(1)
-	printer.TextDebug("clientWriteGoroutineNum current value", "clientWriteGoroutineNum", (*clientWriteGoroutineNum).Load())
+	clientWriteGoroutineNum.Add(1)
+	printer.TextDebug("clientWriteGoroutineNum current value", "clientWriteGoroutineNum", clientWriteGoroutineNum.Load())
 
 	defer func() {
 		ReduceClientToGateMap(newConn) //移除Map中的客户端元素
 		(*newConn).Close()
-		(*clientWriteGoroutineNum).Add(-1) //写协程数量同步变动减少
+		clientWriteGoroutineNum.Add(-1) //写协程数量同步变动减少
 	}()
 
 	sendBuffer := make([]byte, ReadStreamBufferSize)
@@ -102,9 +102,9 @@ func DoWriteMsg(newConn *NewConnection) {
 }
 
 func DoReadMsg(newConn *NewConnection) {
-	(*clientReadGoroutineNum).Add(1)
+	clientReadGoroutineNum.Add(1)
 	AddClientToGateMap(newConn, newConn.writeChan)
-	printer.TextDebug("clientReadGoroutineNum current value", "clientReadGoroutineNum", (*clientReadGoroutineNum).Load())
+	printer.TextDebug("clientReadGoroutineNum current value", "clientReadGoroutineNum", clientReadGoroutineNum.Load())
 
 	defer func() {
 		newConn.rwChannel <- GoroutineSyncBreakSign
@@ -113,7 +113,7 @@ func DoReadMsg(newConn *NewConnection) {
 		if r := recover(); r != nil {
 			printer.TextError("GateInfo.newConnPanic", "Recover", r)
 		}
-		(*clientReadGoroutineNum).Add(-1) //读协程数量同步变动减少
+		clientReadGoroutineNum.Add(-1) //读协程数量同步变动减少
 	}()
 
 	sliceBuffer := make([]byte, ReadStreamBufferSize)
