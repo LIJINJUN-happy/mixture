@@ -344,5 +344,5 @@ func SendGateIDToRemoteSer(cn *net.Conn, linkerName string) {
 	cpSize := copy(body[dataIdxFrom:], dateByte)
 	num := DoPack(dataSlice, body, 1)
 	n, _ := (*cn).Write(dataSlice[:num])
-	printer.TextInfo("SendGateIDToRemoteSer", "sendNum", n, ", LinkerAddress", (*cn).RemoteAddr().String(), "PackSize", cpSize, "linkerName", linkerName)
+	printer.TextInfo("SendGateIDToRemoteSer", "sendNum", n, "LinkerAddress", (*cn).RemoteAddr().String(), "PackSize", cpSize, "linkerName", linkerName)
 }
