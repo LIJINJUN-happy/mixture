@@ -317,7 +317,7 @@ func SendGateIDToRemoteSer(cn *net.Conn, linkerName string) {
 		pbDate := ipb.GateIdSyncInfo{SerName: linkerName, GateId: int32(GateInfo.gateId)}
 		protoBufData, errorGateInfo := proto.Marshal(&pbDate)
 		if errorGateInfo != nil {
-			printer.TextError("sendGateIDToRemoteSer", "proto.Marshal Error", errorGateInfo.Error())
+			printer.TextError("SendGateIDToRemoteSer", "proto.Marshal Error", errorGateInfo.Error())
 			panic(errorGateInfo)
 			return
 		}
@@ -326,7 +326,7 @@ func SendGateIDToRemoteSer(cn *net.Conn, linkerName string) {
 		jsStruct := interior_json.GateIdSyncInfo{SerName: linkerName, GateId: int32(GateInfo.gateId)}
 		jsonData, errorGateInfo := json.Marshal(jsStruct)
 		if errorGateInfo != nil {
-			printer.TextError("sendGateIDToRemoteSer", "json.Marshal Error", errorGateInfo.Error())
+			printer.TextError("SendGateIDToRemoteSer", "json.Marshal Error", errorGateInfo.Error())
 			panic(errorGateInfo)
 			return
 		}
@@ -344,5 +344,5 @@ func SendGateIDToRemoteSer(cn *net.Conn, linkerName string) {
 	cpSize := copy(body[dataIdxFrom:], dateByte)
 	num := DoPack(dataSlice, body, 1)
 	n, _ := (*cn).Write(dataSlice[:num])
-	printer.TextInfo("sendGateIpToRemoteSer", "sendNum", n, ",sendDataSlice", string(dataSlice[:num]), ", LinkerAddress", (*cn).RemoteAddr().String(), "BodySize", cpSize, "linkerName", linkerName)
+	printer.TextInfo("SendGateIDToRemoteSer", "sendNum", n, ",sendDataSlice", string(dataSlice[:num]), ", LinkerAddress", (*cn).RemoteAddr().String(), "BodySize", cpSize, "linkerName", linkerName)
 }
