@@ -76,7 +76,7 @@ func BeginService(sInfo *ServerInfo, sCoon *SerConnObj) {
 		if r := recover(); r != nil {
 			printer.PanicStack(r)
 		}
-		si.DeleteConnObj(sObj.GetGateId())
+		si.DeleteConnObj(sObj.gateAddr, sObj.GetGateId())
 		printer.TextInfo("beginService Goroutine End........")
 	}(sInfo, sCoon)
 
@@ -208,13 +208,13 @@ func Dispose(sInfo *ServerInfo, sCoon *SerConnObj) {
 					sInfo.mux.RLock()
 					curGateSize := sInfo.connObjList.Len()
 					sInfo.mux.RUnlock()
-					printer.TextInfo("dispose SYN GateId", "TarSerName", tarSerName, "ID", gateID, "CurGateSize", curGateSize)
+					printer.TextInfo("dispose SYN GateId", "SerName", tarSerName, "ID", gateID, "ConnObjListSize", curGateSize)
 				} else {
 					//否者直接断开连接
 					ptr := sCoon.gateSerConn
 					sCoon.gateSerConn = nil
 					(*ptr).Close()
-					printer.TextError("dispose SYN GateId", "TarSerName", tarSerName, "Already Exist ID", gateID)
+					printer.TextError("dispose SYN GateId", "SerName", tarSerName, "Already Exist ID", gateID)
 				}
 			}
 		case <-time.After(time.Millisecond):

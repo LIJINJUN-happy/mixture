@@ -113,13 +113,13 @@ func (s *ServerInfo) AddConnObj(c *SerConnObj) {
 	}
 }
 
-// DeleteConnObj 移除来自gateWay的连接对象
-func (s *ServerInfo) DeleteConnObj(gateId int) {
+// 移除来自gateWay的连接对象
+func (s *ServerInfo) DeleteConnObj(gateAddr string, gateId int) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	for iterator := s.connObjList.Front(); iterator != nil; iterator = iterator.Next() {
 		element := iterator.Value.(*SerConnObj)
-		if element.GetGateId() == gateId {
+		if (element.GetGateIPAddr() == gateAddr) && (element.GetGateId() == gateId) {
 			//关闭通信道
 			close(element.sendChannel)
 			close(element.receiveChannel)
@@ -127,7 +127,7 @@ func (s *ServerInfo) DeleteConnObj(gateId int) {
 			//关闭socket, 并从连接链中移除连接对象
 			element.Close("DeleteConnObj")
 			s.connObjList.Remove(iterator)
-			printer.TextInfo("DeleteConnObj Success", "RemoteGateId", gateId, "ServerName", s.ServerName, "ServerId", s.ServerId, "After DeleteConnObj Size", s.connObjList.Len())
+			printer.TextInfo("DeleteConnObj", "RemoteGateId", gateId, "Addr", gateAddr, "ServerName", s.ServerName, "ServerId", s.ServerId, "After DeleteConnObj Size", s.connObjList.Len())
 		}
 	}
 }
@@ -142,10 +142,11 @@ func (s *ServerInfo) GetDisposeFunc() func([]byte, string, int, uint32) {
 
 // SerConnObj 网关连接到服务的连接结构体定义
 type SerConnObj struct {
-	gateId         int       //gateObj的ID（连接过来的网关的ID标识）
+	gateId         int       //连接过来的网关的ID标识
+	gateAddr       string    //连接过来的网关的IP地址
+	gateSerConn    *net.Conn //和gateway_ser连接的connection
 	sendChannel    chan any  //发送数据的通信道(由transmit协程发数据回GateWay)
 	receiveChannel chan any  //接收数据的通信道（接收后存入该管道,由dispose协程处理）
-	gateSerConn    *net.Conn //和gateway_ser连接的connection
 }
 
 func (s *SerConnObj) Init(conn *net.Conn) (bool, string) {
@@ -154,6 +155,7 @@ func (s *SerConnObj) Init(conn *net.Conn) (bool, string) {
 	}
 	s.gateId = -1
 	s.gateSerConn = conn
+	s.gateAddr = (*conn).RemoteAddr().String()
 	s.sendChannel = make(chan any, sendChannelSize)
 	s.receiveChannel = make(chan any, receiveChannelSize)
 	return true, ""
@@ -177,6 +179,10 @@ func (s *SerConnObj) GetReceiveChannel() chan any {
 
 func (s *SerConnObj) GetGateSerConn() *net.Conn {
 	return s.gateSerConn
+}
+
+func (s *SerConnObj) GetGateIPAddr() string {
+	return s.gateAddr
 }
 
 func (s *SerConnObj) Close(funcCmd string) {
