@@ -77,7 +77,7 @@ func BeginService(sInfo *ServerInfo, sCoon *SerConnObj) {
 			printer.PanicStack(r)
 		}
 		si.DeleteConnObj(sObj.gateAddr, sObj.GetGateId())
-		printer.TextInfo("beginService Goroutine End........")
+		printer.TextInfo("BeginService Goroutine End........")
 	}(sInfo, sCoon)
 
 	go Transmit(sInfo, sCoon)
@@ -94,9 +94,9 @@ func BeginService(sInfo *ServerInfo, sCoon *SerConnObj) {
 		num, readError := (*sCoon.gateSerConn).Read(readBuff)
 		if readError != nil {
 			if checkRes, descString := gateway_server.CheckIsCloseByRemote(readError); checkRes {
-				printer.TextInfo("gateSerConn Close With Client", "desc", descString, "ServerName", sInfo.ServerName)
+				printer.TextInfo("GateSerConn Close With Client", "desc", descString, "ServerName", sInfo.ServerName)
 			} else {
-				printer.TextError("gateSerConn Read Error: ", "readError", readError.Error(), "ServerName", sInfo.ServerName)
+				printer.TextError("GateSerConn Read Error: ", "readError", readError.Error(), "ServerName", sInfo.ServerName)
 			}
 			return
 		}
@@ -124,7 +124,7 @@ func Transmit(sInfo *ServerInfo, sCoon *SerConnObj) {
 			printer.PanicStack(r)
 		}
 		s.Close("Transmit")
-		printer.TextInfo("transmit Goroutine End........")
+		printer.TextInfo("Transmit Goroutine End........")
 	}(sCoon)
 
 	dataSlice := make([]byte, gateway_server.ReadStreamBufferSize)
@@ -157,7 +157,7 @@ func Dispose(sInfo *ServerInfo, sCoon *SerConnObj) {
 			printer.PanicStack(r)
 		}
 		s.Close("Dispose")
-		printer.TextInfo("dispose Goroutine End........")
+		printer.TextInfo("Dispose Goroutine End........")
 	}(sCoon)
 
 	//收取通信道传输过来切割好的数据包内容
@@ -208,13 +208,13 @@ func Dispose(sInfo *ServerInfo, sCoon *SerConnObj) {
 					sInfo.mux.RLock()
 					curGateSize := sInfo.connObjList.Len()
 					sInfo.mux.RUnlock()
-					printer.TextInfo("dispose SYN GateId", "FromLinkerName", linkerName, "ID", gateID, "ConnObjListSize", curGateSize)
+					printer.TextInfo("Dispose SYN GateId", "FromLinkerName", linkerName, "ID", gateID, "ConnObjListSize", curGateSize)
 				} else {
 					//否者直接断开连接
 					ptr := sCoon.gateSerConn
 					sCoon.gateSerConn = nil
 					(*ptr).Close()
-					printer.TextError("dispose SYN GateId", "FromLinkerName", linkerName, "Already Exist GateID", gateID)
+					printer.TextError("Dispose SYN GateId", "FromLinkerName", linkerName, "Already Exist GateID", gateID)
 				}
 			}
 		case <-time.After(time.Millisecond):
