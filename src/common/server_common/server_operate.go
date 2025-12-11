@@ -208,13 +208,13 @@ func Dispose(sInfo *ServerInfo, sCoon *SerConnObj) {
 					sInfo.mux.RLock()
 					curGateSize := sInfo.connObjList.Len()
 					sInfo.mux.RUnlock()
-					printer.TextInfo("Dispose SYN GateId", "From Linker", linkerName, "ID", gateID, "ConnObjListSize", curGateSize)
+					printer.TextInfo("Dispose SYN GateId", "From GateLinker", linkerName, "GateID", gateID, "ConnObjListSize", curGateSize)
 				} else {
 					//否者直接断开连接
 					ptr := sCoon.gateSerConn
 					sCoon.gateSerConn = nil
 					(*ptr).Close()
-					printer.TextError("Dispose SYN GateId", "From Linker", linkerName, "Already Exist GateID", gateID)
+					printer.TextError("Dispose SYN GateId", "From GateLinker", linkerName, "Already Exist GateID", gateID)
 				}
 			}
 		case <-time.After(time.Millisecond):
