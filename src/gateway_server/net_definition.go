@@ -132,7 +132,7 @@ func (netObj *NewConnection) RemoteAddr() net.Addr {
 	return (netObj.wsConn).RemoteAddr()
 }
 
-// SerLinker 进程连接器（和其他服务进程的链接对象）
+// SerLinker进程连接器（和其他服务进程的链接对象）
 type SerLinker struct {
 	linkerName     string
 	address        string

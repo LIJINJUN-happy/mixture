@@ -25,7 +25,7 @@ type TickerElement struct {
 	name        string        //定时器命名
 }
 
-// TimerStart 开始计时器开启
+// 开始计时器开启
 func TimerCreate(timerName string, tickType uint8, intervalSec int) *TickerElement {
 	t := new(TickerElement)
 	t.Timer = nil

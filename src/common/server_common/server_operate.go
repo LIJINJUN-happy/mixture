@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// CreateServerMonitor 创建服务监视逻辑
+// 创建服务监视逻辑
 func CreateServerMonitor(s *ServerInfo, f func([]byte, string, int, uint32)) {
 	serName := s.ServerName
 	serId := s.ServerId
@@ -263,7 +263,7 @@ func (s *ServerInfo) TryCallServerFunc(data []byte, proName string) {
 	}
 }
 
-// DeliveryMsg 该协议用于发送服务中的协议返回gate进程处理,参数①发送目标网关的ID,②sessionId(非发送给客户端可以为0否者必须指定sessionID),③协议名字,④数据内容
+// 该协议用于发送服务中的协议返回gate进程处理,参数①发送目标网关的ID,②sessionId(非发送给客户端可以为0否者必须指定sessionID),③协议名字,④数据内容
 func DeliveryMsg(gateID int, sessionId uint32, protoName string, data []byte) {
 	protoNum, searchRes := gateway_server.ProtocolDistributeInfo.ProtoNameMap[protoName]
 	if !searchRes {
