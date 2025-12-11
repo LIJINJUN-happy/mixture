@@ -187,7 +187,7 @@ func (s *SerConnObj) GetGateIPAddr() string {
 func (s *SerConnObj) Close(funcCmd string) {
 	if s.gateSerConn != nil {
 		if closeError := (*s.gateSerConn).Close(); closeError != nil {
-			printer.TextError("gateSerConn Close Fail", "Close Error", closeError.Error(), "funcCmd", funcCmd)
+			printer.TextError("GateSerConn Close Fail", "Close Error", closeError.Error(), "funcCmd", funcCmd)
 		}
 		s.gateSerConn = nil
 	}

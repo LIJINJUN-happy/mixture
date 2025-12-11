@@ -36,12 +36,12 @@ func DoDistribute(cutList *list.List, sliceBuffer []byte, sourceSession uint32) 
 		elementProtoNum := binary.BigEndian.Uint16(data[SessionIdLen : SessionIdLen+ProtoNumLen])
 		protoName, canFindProtoName := ProtocolDistributeInfo.ProtoNumMap[elementProtoNum]
 		if !canFindProtoName {
-			printer.TextWarn("doDistribute", "protoName is nil, elementProtoNum", elementProtoNum)
+			printer.TextWarn("DoDistribute", "protoName is nil, elementProtoNum", elementProtoNum)
 			continue
 		}
 		protoSendSerName, canFindProtoSendSerName := ProtocolDistributeInfo.ProtoDistributeMap[protoName]
 		if !canFindProtoSendSerName {
-			printer.TextWarn("doDistribute", "protoSendSerName is nil, protoName", protoName)
+			printer.TextWarn("DoDistribute", "protoSendSerName is nil, protoName", protoName)
 			continue
 		}
 		//printer.TextInfo("doDistribute", "protoName: ", protoName, "protoSendSerName: ", protoSendSerName)
@@ -63,7 +63,7 @@ func DoDistribute(cutList *list.List, sliceBuffer []byte, sourceSession uint32) 
 					session.clientBuffChannel <- data[SessionIdLen:]
 				}
 			} else if sendTarSessionID == 0 {
-				printer.TextWarn("doDistribute Check serFunc", "protoName", protoName)
+				printer.TextWarn("DoDistribute Check serFunc", "protoName", protoName)
 				switch protoName {
 				case "xxxx":
 				case "xxxxx":
@@ -244,7 +244,7 @@ func CheckLoadProtocol() {
 	if (sizeNum == sizeName) && (sizeName == sizeDistribute) {
 		return
 	}
-	panic("checkLoadProtocol Error")
+	panic("CheckLoadProtocol Error")
 }
 
 // Gate进程发送协议去服务进程
