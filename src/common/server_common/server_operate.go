@@ -181,7 +181,7 @@ func Dispose(sInfo *ServerInfo, sCoon *SerConnObj) {
 				fun(dataSlice[dataIdxFrom:], protoName, sCoon.gateId, sessionId)
 			} else if (protoNum == 0) && (sCoon.gateId < 0) {
 				gateID := -1
-				tarSerName := ""
+				linkerName := ""
 				if gateway_server.ProtocolDistributeInfo.ProtocolType == "protobuf" {
 					gatePbStruct := new(ipb.GateIdSyncInfo)
 					errUnmarshal := proto.Unmarshal(dataSlice[dataIdxFrom:], gatePbStruct)
@@ -190,7 +190,7 @@ func Dispose(sInfo *ServerInfo, sCoon *SerConnObj) {
 						break
 					}
 					gateID = int(gatePbStruct.GateId)
-					tarSerName = gatePbStruct.SerName
+					linkerName = gatePbStruct.SerName
 				} else {
 					jsStruct := new(interior_json.GateIdSyncInfo)
 					errUnmarshal := json.Unmarshal(dataSlice[dataIdxFrom:], jsStruct)
@@ -199,7 +199,7 @@ func Dispose(sInfo *ServerInfo, sCoon *SerConnObj) {
 						break
 					}
 					gateID = int(jsStruct.GateId)
-					tarSerName = jsStruct.SerName
+					linkerName = jsStruct.SerName
 				}
 
 				//检测一下是否存已存在对应的网关ID标识，不可重复，需要保证唯一ID标识
@@ -208,13 +208,13 @@ func Dispose(sInfo *ServerInfo, sCoon *SerConnObj) {
 					sInfo.mux.RLock()
 					curGateSize := sInfo.connObjList.Len()
 					sInfo.mux.RUnlock()
-					printer.TextInfo("dispose SYN GateId", "SerName", tarSerName, "ID", gateID, "ConnObjListSize", curGateSize)
+					printer.TextInfo("dispose SYN GateId", "FromLinkerName", linkerName, "ID", gateID, "ConnObjListSize", curGateSize)
 				} else {
 					//否者直接断开连接
 					ptr := sCoon.gateSerConn
 					sCoon.gateSerConn = nil
 					(*ptr).Close()
-					printer.TextError("dispose SYN GateId", "SerName", tarSerName, "Already Exist ID", gateID)
+					printer.TextError("dispose SYN GateId", "FromLinkerName", linkerName, "Already Exist GateID", gateID)
 				}
 			}
 		case <-time.After(time.Millisecond):

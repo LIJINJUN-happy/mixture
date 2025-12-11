@@ -105,11 +105,10 @@ func (s *ServerInfo) GetConnObj(gateID int) *SerConnObj {
 }
 
 func (s *ServerInfo) AddConnObj(c *SerConnObj) {
-	remoteIp := (*c.gateSerConn).RemoteAddr().String()
 	s.mux.Lock()
 	defer s.mux.Unlock()
 	if s.connObjList.PushBack(c) != nil {
-		printer.TextInfo("AddConnObj New Conn Success", "RemoteAddr", remoteIp, "ServerName", s.ServerName, "ServerId", s.ServerId)
+		printer.TextInfo("AddConnObj New Gate Connect Success", "RemoteAddr", (*c).GetGateIPAddr())
 	}
 }
 
@@ -127,7 +126,7 @@ func (s *ServerInfo) DeleteConnObj(gateAddr string, gateId int) {
 			//关闭socket, 并从连接链中移除连接对象
 			element.Close("DeleteConnObj")
 			s.connObjList.Remove(iterator)
-			printer.TextInfo("DeleteConnObj", "RemoteGateId", gateId, "Addr", gateAddr, "ServerName", s.ServerName, "ServerId", s.ServerId, "After DeleteConnObj Size", s.connObjList.Len())
+			printer.TextInfo("DeleteConnObj", "RemoteGateId", gateId, "Addr", gateAddr, "After DeleteConnObj Size", s.connObjList.Len())
 		}
 	}
 }
