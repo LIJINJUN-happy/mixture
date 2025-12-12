@@ -67,7 +67,7 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 	cutList := list.New()
 	for {
 		//设置读取的超时时间
-		dLineTime := time.Now().Add(ConnectionInfo.connReadTimeout)
+		dLineTime := time.Now().Add(ConnectionOperationDefinition.connReadTimeout)
 		err := newConn.wsConn.SetReadDeadline(dLineTime)
 		if err != nil {
 			printer.TextError("WebSocket SetReadDeadline", "Error", err.Error())

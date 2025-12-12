@@ -30,11 +30,11 @@ const intervalLoopingTime = 30 * time.Second
 // 白名单指针对象
 var WhiteListPtr = new(WhiteList)
 
-// 网关全局对象
+// 网关服务器的全局对象
 var GateClientMap = new(sync.Map)
 var GateClientMapSize = new(atomic.Int32)
 var GateInfo = new(GateInformation)
-var ConnectionInfo = new(ConnectionInformation)
+var ConnectionOperationDefinition = new(ConnOperationDefinition)
 
 // IO/协程数量
 var clientReadGoroutineNum = new(atomic.Int32)
@@ -108,8 +108,8 @@ type clientSession struct {
 	clientBuffChannel chan []byte //客户端的接收协议的通信道
 }
 
-// ConnectionInformation for Client Connect Operation Object,conn对象的socket操作相关参数
-type ConnectionInformation struct {
+// conn对象的socket定义的相关操作参数，如读取长度以及超时等定义内容
+type ConnOperationDefinition struct {
 	connReadBufSize   int           //每次读取客户端传来的数据长度大小
 	connReadTimeout   time.Duration //读取用户超时间隔（为了防止长时间无响应的情况）
 	connWriteChanCaps int           //写信道缓存容量
@@ -143,8 +143,8 @@ func (newConnection *NewConnection) Init(way int, socketConn *net.Conn, wSocketC
 	newConnection.connSession = 0
 	newConnection.connType = typeofConn
 	newConnection.connTime = time.Now()
-	newConnection.ReadBuf = make([]byte, ConnectionInfo.connReadBufSize)
-	newConnection.writeChan = make(chan []byte, ConnectionInfo.connWriteChanCaps)
+	newConnection.ReadBuf = make([]byte, ConnectionOperationDefinition.connReadBufSize)
+	newConnection.writeChan = make(chan []byte, ConnectionOperationDefinition.connWriteChanCaps)
 	newConnection.rwChannel = make(chan string, 2)
 
 	//设置ipString作为Goroutine的标识映射

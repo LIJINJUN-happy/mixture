@@ -116,10 +116,10 @@ func DoInit(db *sql.DB) bool {
 		panic("\nArgs Error With GateWay's Protocol: " + GateInfo.protocol + " , Should Be 'json' or 'protobuf'")
 	}
 
-	//ConnectionInfo初始化(TCP模式的相关参数)
-	ConnectionInfo.connReadBufSize = 255
-	ConnectionInfo.connReadTimeout = 900 * time.Second
-	ConnectionInfo.connWriteChanCaps = 5
+	//ConnectionOperationDefinition初始化(TCP模式的相关参数)
+	ConnectionOperationDefinition.connReadBufSize = 255
+	ConnectionOperationDefinition.connReadTimeout = 900 * time.Second
+	ConnectionOperationDefinition.connWriteChanCaps = 5
 
 	//ActorSerLinker初始化
 	actorSerLinker.InitLinker("actorSer", db, GateInfo.gateId)

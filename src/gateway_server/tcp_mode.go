@@ -111,7 +111,7 @@ func DoReadMsg(newConn *NewConnection) {
 	cutList := list.New()
 	for {
 		//置下次读取的超时时间
-		dLineTime := time.Now().Add(ConnectionInfo.connReadTimeout)
+		dLineTime := time.Now().Add(ConnectionOperationDefinition.connReadTimeout)
 		err := (*(newConn.conn)).SetReadDeadline(dLineTime)
 		if err != nil {
 			printer.TextError("Socket SetReadDeadline", "Error", err.Error())
