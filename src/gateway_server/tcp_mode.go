@@ -51,8 +51,10 @@ func BeginTcpSer() {
 			newConn.Init(1, &conn, nil, "tcp")
 
 			// 读写分离
-			go DoWriteMsg(newConn)
-			DoReadMsg(newConn)
+			go func() {
+				go DoWriteMsg(newConn)
+				DoReadMsg(newConn)
+			}()
 		}
 	}
 
