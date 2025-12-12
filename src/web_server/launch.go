@@ -6,7 +6,6 @@ import (
 	"mixture/proto/mutual_pb/pb"
 	"mixture/src/common/printer"
 	"mixture/src/common/server_common"
-	"mixture/src/common/settings"
 	"os"
 	"strconv"
 )
@@ -35,7 +34,7 @@ func webSerProcessor(data []byte, proName string, gateId int, sessionID uint32) 
 		server_common.DeliveryMsg(gateId, sessionID, "S2CTestRet", sendData)
 	}
 
-	cfg := settings.ConstCfg.Load()
+	/*cfg := settings.ConstCfg.Load()
 	if cfg != nil {
 		printer.TextInfo("cfg print Fix Before", "pcfg.Const.HeroInitList", cfg.Const.HeroInitList)
 	}
@@ -43,5 +42,5 @@ func webSerProcessor(data []byte, proName string, gateId int, sessionID uint32) 
 	cfg = settings.ConstCfg.Load()
 	if cfg != nil {
 		printer.TextInfo("cfg print Fix After", "pcfg.Const.HeroInitList", cfg.Const.HeroInitList)
-	}
+	}*/
 }
