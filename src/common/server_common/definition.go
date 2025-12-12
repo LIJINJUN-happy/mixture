@@ -97,6 +97,7 @@ func (s *ServerInfo) GetConnObj(gateID int) *SerConnObj {
 	return nil
 }
 
+// 添加gate连接对象，并返回添加后集合最新长度
 func (s *ServerInfo) AddConnObj(c *SerConnObj) int {
 	s.mux.Lock()
 	defer s.mux.Unlock()
