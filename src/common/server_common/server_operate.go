@@ -84,7 +84,8 @@ func BeginService(sInfo *ServerInfo, sCoon *SerConnObj) {
 	time.Sleep(2 * time.Second)
 
 	//读取网关发送过来的数据
-	readObj := gateway_server.CreateReadStreamBufferObject(1) //进程间默认用模式1分割字节数据
+	readObj := new(gateway_server.ReadStreamBufferObject)
+	readObj.Init(1) //进程间默认用模式1分割字节数据
 	readBuff, sliceBuffer := make([]byte, 255), make([]byte, gateway_server.ReadStreamBufferSize)
 	cutList := list.New()
 	idx := 0

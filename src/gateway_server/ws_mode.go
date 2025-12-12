@@ -43,11 +43,12 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 		wsConn.Close()
 		return
 	}
-
 	printer.TextInfo("Upgraded WebSocket Connection Successfully")
-	newConn := CreateNewConnObject(1, nil, wsConn, "ws")
+
+	newConn := new(NewConnection)
+	newConn.Init(1, nil, wsConn, "ws")
 	clientReadGoroutineNum.Add(1)
-	AddClientToGateMap(newConn, newConn.writeChan)
+	newConn.AddIntoGateMap(newConn.writeChan)
 
 	defer func(wsc *NewConnection) {
 		wsc.rwChannel <- GoroutineSyncBreakSign

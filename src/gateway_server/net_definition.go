@@ -3,6 +3,7 @@ package gateway_server
 import (
 	"database/sql"
 	"github.com/gorilla/websocket"
+	"mixture/src/common/printer"
 	"mixture/src/database"
 	"net"
 	"net/http"
@@ -25,6 +26,65 @@ const appointLen uint16 = 556             //定长读取字节流的长度
 const channelBufferSize = 1024            //channelArray中每个chan的缓存大小
 const GoroutineSyncBreakSign = "_CLOSE"
 const intervalLoopingTime = 30 * time.Second
+
+// 白名单指针对象
+var WhiteListPtr = new(WhiteList)
+
+// 网关全局对象
+var GateClientMap = new(sync.Map)
+var GateClientMapSize = new(atomic.Int32)
+var GateInfo = new(GateInformation)
+var ConnectionInfo = new(ConnectionInformation)
+
+// IO/协程数量
+var clientReadGoroutineNum = new(atomic.Int32)
+var clientWriteGoroutineNum = new(atomic.Int32)
+
+// WebSocket定义的全局结构对象
+var upgrade = websocket.Upgrader{
+	ReadBufferSize:  ReadStreamBufferSize,
+	WriteBufferSize: ReadStreamBufferSize,
+
+	//该函数用于拦截或放行跨域请求。函数返回值为bool类型，即true放行，false拦截。如果请求不是跨域请求可以不赋值
+	CheckOrigin: func(r *http.Request) bool {
+		return true // 允许所有源，生产环境中应根据需要设置更严格的CORS策略
+	},
+}
+
+// 链接器对象
+var actorSerLinker = new(SerLinker)
+var interactiveSerLinker = new(SerLinker)
+var modularizedSerLinker = new(SerLinker)
+var webSerLinker = new(SerLinker)
+
+// 白名单结构
+type WhiteList struct {
+	WhiteMux sync.RWMutex      //使用读写锁,因为绝大部分都是读比较多
+	WhiteMap map[string]string //白名单字典
+	IsActive bool              //是否开启
+}
+
+// NewConnection for Client Connect Object conn对象结构
+type NewConnection struct {
+	connSession  uint32
+	connType     string
+	connTime     time.Time
+	conn         *net.Conn       //socket对象(tcp模式)
+	wsConn       *websocket.Conn //socket对象(ws模式)
+	ReadBuf      []byte          //socket读取的数据存放切片
+	writeChan    chan []byte     //socket获取数据的通信道（来自其他进程进程的数据）
+	rwChannel    chan string     //用于conn对象的Read和Write协程间的通知,实现同步关闭,不同步关闭的话会造成内存泄露
+	ipString     string          //网络地址
+	StreamBuffer *ReadStreamBufferObject
+}
+
+// SerLinker进程连接器（和其他服务进程的链接对象）
+type SerLinker struct {
+	linkerName     string
+	address        string
+	receiveChannel chan any  //用来接收所有将要派发到对应进程的数据（相当于连接器发送缓存通道）
+	serConn        *net.Conn //链接xx服务进程的socket对象
+}
 
 // GateInformation for GateWaySer Object 网关服务相关参数
 type GateInformation struct {
@@ -55,21 +115,7 @@ type ConnectionInformation struct {
 	connWriteChanCaps int           //写信道缓存容量
 }
 
-// NewConnection for Client Connect Object conn对象结构
-type NewConnection struct {
-	connSession  uint32
-	connType     string
-	connTime     time.Time
-	conn         *net.Conn       //socket对象(tcp模式)
-	wsConn       *websocket.Conn //socket对象(ws模式)
-	ReadBuf      []byte          //socket读取的数据存放切片
-	writeChan    chan []byte     //socket获取数据的通信道（来自其他进程进程的数据）
-	rwChannel    chan string     //用于conn对象的Read和Write协程间的通知,实现同步关闭,不同步关闭的话会造成内存泄露
-	ipString     string          //网络地址
-	StreamBuffer *ReadStreamBufferObject
-}
-
-// ReadStreamBufferObject 读取字节流的数据存放处,每个包都是头部2字节，2字节保存的值是数据的长度
+// ReadStreamBufferObject读取字节流的数据存放处,每个包都是头部2字节，2字节保存的值是数据的长度
 type ReadStreamBufferObject struct {
 	readWay          uint8   //字节流切割方式
 	headReadArray    []uint8 //包头已读字节（tcp属于字节流,被分割的有可能是包头部分）
@@ -78,23 +124,72 @@ type ReadStreamBufferObject struct {
 	byteData         []byte  //目前读取的字节数据
 }
 
-var GateClientMap = new(sync.Map)
-var GateClientMapSize = new(atomic.Int32)
-var GateInfo = new(GateInformation)
-var ConnectionInfo = new(ConnectionInformation)
+// ReadStreamBufferObject初始化方法
+func (streanBuff *ReadStreamBufferObject) Init(way int) {
+	streanBuff.readWay = uint8(way)
+	streanBuff.headReadArray = make([]uint8, 0, HeadLen)
+	streanBuff.totalNeedReadLen = 0
+	streanBuff.curReadLen = 0
+	streanBuff.byteData = make([]byte, 0, ReadStreamBufferSize)
+}
 
-// IO/协程数量
-var clientReadGoroutineNum = new(atomic.Int32)
-var clientWriteGoroutineNum = new(atomic.Int32)
+// 初始化NewConnection对象
+func (newConnection *NewConnection) Init(way int, socketConn *net.Conn, wSocketConn *websocket.Conn, typeofConn string) {
+	rsbObject := new(ReadStreamBufferObject)
+	rsbObject.Init(way)
+	newConnection.StreamBuffer = rsbObject
+	newConnection.wsConn = wSocketConn
+	newConnection.conn = socketConn
+	newConnection.connSession = 0
+	newConnection.connType = typeofConn
+	newConnection.connTime = time.Now()
+	newConnection.ReadBuf = make([]byte, ConnectionInfo.connReadBufSize)
+	newConnection.writeChan = make(chan []byte, ConnectionInfo.connWriteChanCaps)
+	newConnection.rwChannel = make(chan string, 2)
 
-var upgrade = websocket.Upgrader{
-	ReadBufferSize:  ReadStreamBufferSize,
-	WriteBufferSize: ReadStreamBufferSize,
+	//设置ipString作为Goroutine的标识映射
+	if socketConn != nil {
+		newConnection.ipString = (*socketConn).RemoteAddr().String()
+	} else if wSocketConn != nil {
+		newConnection.ipString = (*wSocketConn).RemoteAddr().String()
+	}
+}
 
-	//该函数用于拦截或放行跨域请求。函数返回值为bool类型，即true放行，false拦截。如果请求不是跨域请求可以不赋值
-	CheckOrigin: func(r *http.Request) bool {
-		return true // 允许所有源，生产环境中应根据需要设置更严格的CORS策略
-	},
+// 往map中添加newConnection对应的writeChan
+func (newConnection *NewConnection) AddIntoGateMap(writeChan chan []byte) {
+	clientAddress := (*newConnection).RemoteAddr().String()
+	//printer.TextDebug("clientAddress = " + clientAddress)
+	GateInfo.curDistributionSessionID += 1
+	sessionId := GateInfo.curDistributionSessionID
+	if _, ok := GateClientMap.Load(sessionId); ok {
+		return
+	}
+
+	//修改gateMap的对应客户端数据
+	ip, port, _ := strings.Cut(clientAddress, ":")
+	realPort, _ := strconv.Atoi(port)
+	sessionPtr := new(clientSession)
+	sessionPtr.ip = net.ParseIP(ip)
+	sessionPtr.port = uint16(realPort)
+	sessionPtr.wholeAddress = clientAddress
+	sessionPtr.clientBuffChannel = writeChan
+	GateClientMap.Store(sessionId, sessionPtr)
+
+	//标记该连接的SessionID
+	newConnection.connSession = sessionId
+	sessionPtr.session = sessionId
+	GateClientMapSize.Add(1)
+	printer.TextDebug("After add client to GateMap", "The Size", GateClientMapSize.Load())
+}
+
+// 移除map中的 writeChan,防止有数据继续写入而触发panic
+func (newConnection *NewConnection) ReduceFromGateMap() {
+	//clientAddress := (*newConnection).RemoteAddr().String()
+	if newConnection.connSession > 0 {
+		GateClientMap.Delete(newConnection.connSession)
+		GateClientMapSize.Add(-1)
+	}
+	printer.TextDebug("After reduce client to GateMap", "The Size", GateClientMapSize.Load())
 }
 
 func (netObj *NewConnection) Write(b []byte) (n int, err error) {
@@ -132,20 +227,6 @@ func (netObj *NewConnection) RemoteAddr() net.Addr {
 	return (netObj.wsConn).RemoteAddr()
 }
 
-// SerLinker进程连接器（和其他服务进程的链接对象）
-type SerLinker struct {
-	linkerName     string
-	address        string
-	receiveChannel chan any  //用来接收所有将要派发到对应进程的数据（相当于连接器发送缓存通道）
-	serConn        *net.Conn //链接xx服务进程的socket对象
-}
-
-// 链接器对象
-var actorSerLinker = new(SerLinker)
-var interactiveSerLinker = new(SerLinker)
-var modularizedSerLinker = new(SerLinker)
-var webSerLinker = new(SerLinker)
-
 func (linker *SerLinker) InitLinker(linkerName string, db *sql.DB, linkerID int) {
 	address := database.GetSerAddressById(linkerID, db, linkerName)
 	port := database.GetSerPortById(linkerID, db, linkerName)
@@ -166,16 +247,6 @@ func (linker *SerLinker) InitLinker(linkerName string, db *sql.DB, linkerID int)
 	linker.address = strBuilder.String()
 	return
 }
-
-// 白名单结构
-type WhiteList struct {
-	WhiteMux sync.RWMutex      //使用读写锁,因为绝大部分都是读比较多
-	WhiteMap map[string]string //白名单字典
-	IsActive bool              //是否开启
-}
-
-// 白名单指针对象
-var WhiteListPtr = new(WhiteList)
 
 func (w *WhiteList) CheckWhiteIP(addr string) bool {
 	w.WhiteMux.RLock()

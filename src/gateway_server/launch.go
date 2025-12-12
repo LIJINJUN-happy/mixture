@@ -5,7 +5,9 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"google.golang.org/protobuf/proto"
+	"io"
 	"mixture/proto/interior_json"
 	"mixture/proto/interior_pb/ipb"
 	"mixture/src/common/printer"
@@ -345,4 +347,31 @@ func SendGateIDToRemoteSer(cn *net.Conn, linkerName string) {
 	num := DoPack(dataSlice, body, 1)
 	n, _ := (*cn).Write(dataSlice[:num])
 	printer.TextInfo("SendGateIDToRemoteSer", "sendNum", n, "LinkerAddress", (*cn).RemoteAddr().String(), "PackSize", cpSize, "linkerName", linkerName)
+}
+
+func CheckIsCloseByRemote(readError error) (bool, string) {
+	errString := readError.Error()
+	if readError == io.EOF {
+		return true, "Close Normal" //对端正常断开连接(socket)
+	}
+	if (strings.Index(errString, "websocket") > -1) && (strings.Index(errString, "EOF") > -1) {
+		return true, "Close Normal" //对端正常断开连接(WebSocket)
+	}
+	if strings.Index(errString, "forcibly closed") > -1 {
+		return true, "Close Forcibly" //异常断开
+	}
+	return false, ""
+}
+
+func CheckIsReadTimeOut(readError error) bool {
+	theType := new(net.Error)
+	switch {
+	case errors.As(readError, theType):
+		if (*theType).Timeout() {
+			break
+		}
+	default:
+		return false
+	}
+	return true
 }

@@ -13,7 +13,7 @@ import (
 )
 
 // 协议格式：[[sessionID(4字节)][proNum(2字节)][data(xxx字节)]]
-// doDistribute函数负责数据的判断与转发(sourceSession 用于区别是来自服务器内部还是客户端,假如来自客户端需要添加上相关的字段内容再做转发)
+// 该函数负责数据的判断与转发(sourceSession 用于区别是来自服务器内部还是客户端,假如来自客户端需要添加上相关的字段内容再做转发)
 func DoDistribute(cutList *list.List, sliceBuffer []byte, sourceSession uint32) {
 	beginIdx := 0
 	extraLen := 0
