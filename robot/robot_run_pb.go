@@ -148,7 +148,7 @@ func robotRecPBMsg(r *TestRobot, newConn *net.Conn) {
 					if diff <= num {                   //假如所需剩余读取数据的长度小于等于接收到的数据长度,直接形成一个包即可
 						num -= diff
 						compData = append(compData[:curDataSize], readData[:diff]...)
-						robDealPBMsg(compData[:needReadSize], diff, curDataSize, num)
+						robDealPBMsg(r, compData[:needReadSize], diff, curDataSize, num)
 
 						//切好一个包需要重置相关数据内容，然后继续开始切下一个包
 						headData = make([]byte, 2)
@@ -182,7 +182,7 @@ func robotRecPBMsg(r *TestRobot, newConn *net.Conn) {
 	}
 }
 
-func robDealPBMsg(data []byte, needReadSize, curDataSize, num int) {
+func robDealPBMsg(r *TestRobot, data []byte, needReadSize, curDataSize, num int) {
 	proNum := binary.BigEndian.Uint16(data[0:gateway_server.ProtoNumLen])
 	proString, resSearch := gateway_server.ProtocolDistributeInfo.ProtoNumMap[proNum]
 	if resSearch {
@@ -190,7 +190,7 @@ func robDealPBMsg(data []byte, needReadSize, curDataSize, num int) {
 		case "S2CTestRet":
 			t := new(pb.S2CTestRet)
 			proto.Unmarshal(data[gateway_server.ProtoNumLen:], t)
-			//fmt.Println("S2CTestRet 's Num = ", t.Num)
+			fmt.Println("S2CTestRet 's Num = ", t.Num, "robotName = ", r.name, "robotID = ", r.uid)
 		default:
 		}
 
