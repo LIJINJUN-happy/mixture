@@ -3,7 +3,6 @@ package modularized_server
 import (
 	"google.golang.org/protobuf/proto"
 	"mixture/proto/interior_pb/ipb"
-	"mixture/src/common/printer"
 	"mixture/src/common/server_common"
 	"os"
 	"strconv"
@@ -21,12 +20,12 @@ func Run() {
 }
 
 func modularizedSerProcessor(data []byte, proName string, gateId int, sessionID uint32) {
-	printer.TextInfo("modularizedSerProcessor", "proName", proName, "gateId", gateId, "sessionID", sessionID, "data", string(data))
+	/*printer.TextInfo("modularizedSerProcessor", "proName", proName, "gateId", gateId, "sessionID", sessionID, "data", string(data))
 	pStruct := new(ipb.S2SHotFixModularizedSerSettings)
 	errUnmarshal := proto.Unmarshal(data, pStruct)
 	if errUnmarshal == nil {
 		printer.TextInfo("modularizedSerProcessor", "pStruct.HotFixAll", pStruct.HotFixAll)
-	}
+	}*/
 
 	pbData := ipb.S2SHotFixInteractiveSerSettings{HotFixAll: true}
 	sendData, mRes := proto.Marshal(&pbData)

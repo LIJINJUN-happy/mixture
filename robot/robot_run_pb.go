@@ -123,7 +123,7 @@ func robotRecPBMsg(r *TestRobot, newConn *net.Conn) {
 			panic("robotRecMsg :" + readError.Error())
 			return
 		} else {
-			//fmt.Println("doReadMsg", "num", num, "message", string(readData[:num])) //处理接收到的数据
+			fmt.Println("doReadMsg", "num", num, "message", string(readData[:num])) //处理接收到的数据
 			for {
 				if headSizeAlreadyRead < gateway_server.HeadLen { //没读取完数据头（读取完数据头才知道包体长度）
 					diffHead := gateway_server.HeadLen - headSizeAlreadyRead //数据头剩余所需长度

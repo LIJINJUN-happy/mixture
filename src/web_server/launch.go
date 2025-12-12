@@ -2,7 +2,6 @@ package web_server
 
 import (
 	"google.golang.org/protobuf/proto"
-	"mixture/proto/interior_pb/ipb"
 	"mixture/proto/mutual_pb/pb"
 	"mixture/src/common/printer"
 	"mixture/src/common/server_common"
@@ -22,11 +21,11 @@ func Run() {
 
 func webSerProcessor(data []byte, proName string, gateId int, sessionID uint32) {
 	printer.TextInfo("webSerProcessor", "proName", proName, "gateId", gateId, "sessionID", sessionID, "data", string(data))
-	pStruct := new(ipb.S2SHotFixWebSerSettings)
+	/*pStruct := new(ipb.S2SHotFixWebSerSettings)
 	errUnmarshal := proto.Unmarshal(data, pStruct)
 	if errUnmarshal == nil {
 		printer.TextInfo("webSerProcessor", "pStruct.HotFixAll", pStruct.HotFixAll, "path", pStruct.SettingsInfo)
-	}
+	}*/
 
 	ret := pb.S2CTestRet{Num: int32(100)}
 	sendData, e := proto.Marshal(&ret)
