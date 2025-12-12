@@ -1,7 +1,6 @@
 package server_common
 
 import (
-	"container/list"
 	"database/sql"
 	"mixture/src/common/printer"
 	"mixture/src/database"
@@ -22,8 +21,8 @@ type ServerInfo struct {
 	port                int                                //服务进程的接收端口
 	address             string                             //服务进程的接收地址
 	listenObj           *net.Listener                      //监听对象
-	mux                 sync.RWMutex                       //链表读写锁(防止多个协程同时修改connObjList)
-	connObjList         *list.List                         //用于存放SerConnObj对象指针的链表
+	mux                 sync.RWMutex                       //SerConnObj集合读写锁(防止多个协程同时修改connObjMap)
+	connObjMap          map[int]*SerConnObj                //用于存放SerConnObj对象指针的集合
 	DisposeFunc         func([]byte, string, int, uint32)  //提供一个接口来处理接收到来的数据,参数：协议数据,协议名字,发送信息过来的gateID,用户的SessionID（可以有可以没有）
 	ServerHandleFuncMap map[string]func(data []byte) error //服务处理函数集
 }
@@ -57,8 +56,7 @@ func (s *ServerInfo) InitInfo(serName string, id int) bool {
 	s.ServerName = serName
 	s.ServerId = id
 	s.listenObj = nil
-	s.connObjList = list.New()
-	s.connObjList = s.connObjList.Init()
+	s.connObjMap = make(map[int]*SerConnObj)
 	s.ServerHandleFuncMap = make(map[string]func(data []byte) error)
 	ServicePrt = s
 	return true
@@ -83,11 +81,9 @@ func (s *ServerInfo) GetAddress() string {
 func (s *ServerInfo) CheckConnObjIsExist(gateId int) bool {
 	s.mux.RLock()
 	defer s.mux.RUnlock() //检测只需要添加读锁即可
-	for iterator := s.connObjList.Front(); iterator != nil; iterator = iterator.Next() {
-		element := iterator.Value.(*SerConnObj)
-		if element.GetGateId() == gateId {
-			return true
-		}
+	if obj, ok := s.connObjMap[gateId]; ok {
+		printer.TextError("CheckConnObjIsExist", "Exist Obj", obj)
+		return true
 	}
 	return false
 }
@@ -95,38 +91,34 @@ func (s *ServerInfo) CheckConnObjIsExist(gateId int) bool {
 func (s *ServerInfo) GetConnObj(gateID int) *SerConnObj {
 	s.mux.RLock()
 	defer s.mux.RUnlock() //获取只需要添加读锁即可
-	for iterator := s.connObjList.Front(); iterator != nil; iterator = iterator.Next() {
-		element := iterator.Value.(*SerConnObj)
-		if element.GetGateId() == gateID {
-			return element
-		}
+	if obj, ok := s.connObjMap[gateID]; ok {
+		return obj
 	}
 	return nil
 }
 
-func (s *ServerInfo) AddConnObj(c *SerConnObj) {
+func (s *ServerInfo) AddConnObj(c *SerConnObj) int {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	if s.connObjList.PushBack(c) != nil {
-		printer.TextInfo("AddConnObj New Gate Connect Success", "RemoteAddr", (*c).GetGateIPAddr())
-	}
+	s.connObjMap[c.gateId] = c
+	printer.TextInfo("AddConnObj New Gate Connect Success", "RemoteAddr", (*c).GetGateIPAddr())
+	return len(s.connObjMap)
 }
 
 // 移除来自gateWay的连接对象
 func (s *ServerInfo) DeleteConnObj(gateAddr string, gateId int) {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	for iterator := s.connObjList.Front(); iterator != nil; iterator = iterator.Next() {
-		element := iterator.Value.(*SerConnObj)
-		if (element.GetGateIPAddr() == gateAddr) && (element.GetGateId() == gateId) {
+	if obj, ok := s.connObjMap[gateId]; ok {
+		if (obj.GetGateIPAddr() == gateAddr) && (obj.GetGateId() == gateId) {
 			//关闭通信道
-			close(element.sendChannel)
-			close(element.receiveChannel)
+			close(obj.sendChannel)
+			close(obj.receiveChannel)
 
 			//关闭socket, 并从连接链中移除连接对象
-			element.Close("DeleteConnObj")
-			s.connObjList.Remove(iterator)
-			printer.TextInfo("DeleteConnObj", "RemoteGateId", gateId, "Addr", gateAddr, "After DeleteConnObj Size", s.connObjList.Len())
+			obj.Close("DeleteConnObj")
+			delete(s.connObjMap, gateId)
+			printer.TextInfo("DeleteConnObj", "RemoteGateId", gateId, "Addr", gateAddr, "After DeleteConnObj Size", len(s.connObjMap))
 		}
 	}
 }

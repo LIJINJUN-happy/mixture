@@ -64,7 +64,6 @@ func CreateServerMonitor(s *ServerInfo, f func([]byte, string, int, uint32)) {
 			printer.TextError("Init New Conn Error", desc, "ServerName", serName, "ServerId", serId)
 			continue
 		} else {
-			s.AddConnObj(SerConnObjPtr)
 			go BeginService(s, SerConnObjPtr)
 		}
 	}
@@ -205,10 +204,8 @@ func Dispose(sInfo *ServerInfo, sCoon *SerConnObj) {
 				//检测一下是否存已存在对应的网关ID标识，不可重复，需要保证唯一ID标识
 				if !sInfo.CheckConnObjIsExist(gateID) {
 					sCoon.SetGateId(gateID) //设置网关标识
-					sInfo.mux.RLock()
-					curGateSize := sInfo.connObjList.Len()
-					sInfo.mux.RUnlock()
-					printer.TextInfo("Dispose SYN GateId", "From GateLinker", linkerName, "GateID", gateID, "ConnObjListSize", curGateSize)
+					curGateSize := sInfo.AddConnObj(sCoon)
+					printer.TextInfo("Dispose SYN GateId", "From GateLinker", linkerName, "GateID", gateID, "ConnObjMapSize", curGateSize)
 				} else {
 					//否者直接断开连接
 					ptr := sCoon.gateSerConn
