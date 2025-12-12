@@ -90,15 +90,15 @@ type SerLinker struct {
 
 // GateInformation for GateWaySer Object 网关服务相关参数
 type GateInformation struct {
-	gateId                   int
-	ip                       string
-	port                     string
-	workMode                 string        //tcp or ws(webSocket)
-	protocol                 string        //json or protobuf
-	maxConnSize              int32         //接收客户端数据协程最大并发数量
-	rebuildListenTimes       int8          //重启次数（太多次直接Exit）
-	rebuildListenSec         time.Duration //重新启动监听延迟（监听panic后重启监听的间隔时间）
-	curDistributionSessionID uint32        //当前派发的SessionID（每次有新连接进来都会派发一个新的sessionID作为标识）
+	gateId                      int
+	ip                          string
+	port                        string
+	workMode                    string        //tcp or ws(webSocket)
+	protocol                    string        //json or protobuf
+	maxConnSize                 int32         //接收客户端数据协程最大并发数量
+	rebuildListenTimes          int8          //重启次数（太多次直接Exit）
+	rebuildListenSec            time.Duration //重新启动监听延迟（监听panic后重启监听的间隔时间）
+	sessionIdDistributionRecord uint32        //当前派发的SessionID（每次有新连接进来都会派发一个新的sessionID作为标识）
 }
 
 // 客户端的session元素
@@ -154,8 +154,8 @@ func (newConnection *NewConnection) Init(way int, socketConn *net.Conn, wSocketC
 func (newConnection *NewConnection) AddIntoGateMap(writeChan chan []byte) {
 	clientAddress := (*newConnection).RemoteAddr().String()
 	//printer.TextDebug("clientAddress = " + clientAddress)
-	GateInfo.curDistributionSessionID += 1
-	sessionId := GateInfo.curDistributionSessionID
+	GateInfo.sessionIdDistributionRecord += 1
+	sessionId := GateInfo.sessionIdDistributionRecord
 	if _, ok := GateClientMap.Load(sessionId); ok {
 		return
 	}
