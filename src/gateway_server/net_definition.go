@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+const ConnReadBufSize = 255               //每次读取客户端传来的数据长度大小
+const ConnWriteChanCaps = 5               //写信道缓存容量
 const ReadStreamBufferSize = 1024 * 5     //字节流读取对象的已读书缓存长度
 const MaxConnectClientNum = 5000          //最大客户端同时连接数量
 const messageType int = 1                 //webSocket的消息类型（默认为1文本类型）
@@ -24,8 +26,9 @@ const ProtoNumLen int = 2                 //数据包中的协议占的字节长
 const SessionIdLen int = 4                //数据包来自哪个用户标识的字节长度（来自客户端或者是发送给客户端的时候必须有这个字段内容值,否者找不到发送目标）
 const appointLen uint16 = 556             //定长读取字节流的长度
 const channelBufferSize = 1024            //channelArray中每个chan的缓存大小
+const ConnReadTimeout = 900 * time.Second //读取用户超时间隔（为了防止长时间无响应的情况）
+const IntervalLoopingTime = 30 * time.Second
 const GoroutineSyncBreakSign = "_CLOSE"
-const intervalLoopingTime = 30 * time.Second
 
 // 白名单指针对象
 var WhiteListPtr = new(WhiteList)
@@ -34,7 +37,6 @@ var WhiteListPtr = new(WhiteList)
 var GateClientMap = new(sync.Map)
 var GateClientMapSize = new(atomic.Int32)
 var GateInfo = new(GateInformation)
-var ConnectionOperationDefinition = new(ConnOperationDefinition)
 
 // IO/协程数量
 var clientReadGoroutineNum = new(atomic.Int32)
@@ -108,13 +110,6 @@ type clientSession struct {
 	clientBuffChannel chan []byte //客户端的接收协议的通信道
 }
 
-// conn对象的socket定义的相关操作参数，如读取长度以及超时等定义内容
-type ConnOperationDefinition struct {
-	connReadBufSize   int           //每次读取客户端传来的数据长度大小
-	connReadTimeout   time.Duration //读取用户超时间隔（为了防止长时间无响应的情况）
-	connWriteChanCaps int           //写信道缓存容量
-}
-
 // ReadStreamBufferObject读取字节流的数据存放处,每个包都是头部2字节，2字节保存的值是数据的长度
 type ReadStreamBufferObject struct {
 	readWay          uint8   //字节流切割方式
@@ -143,8 +138,8 @@ func (newConnection *NewConnection) Init(way int, socketConn *net.Conn, wSocketC
 	newConnection.connSession = 0
 	newConnection.connType = typeofConn
 	newConnection.connTime = time.Now()
-	newConnection.ReadBuf = make([]byte, ConnectionOperationDefinition.connReadBufSize)
-	newConnection.writeChan = make(chan []byte, ConnectionOperationDefinition.connWriteChanCaps)
+	newConnection.ReadBuf = make([]byte, ConnReadBufSize)
+	newConnection.writeChan = make(chan []byte, ConnWriteChanCaps)
 	newConnection.rwChannel = make(chan string, 2)
 
 	//设置ipString作为Goroutine的标识映射

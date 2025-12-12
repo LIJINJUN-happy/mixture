@@ -116,11 +116,6 @@ func DoInit(db *sql.DB) bool {
 		panic("\nArgs Error With GateWay's Protocol: " + GateInfo.protocol + " , Should Be 'json' or 'protobuf'")
 	}
 
-	//ConnectionOperationDefinition初始化(TCP模式的相关参数)
-	ConnectionOperationDefinition.connReadBufSize = 255
-	ConnectionOperationDefinition.connReadTimeout = 900 * time.Second
-	ConnectionOperationDefinition.connWriteChanCaps = 5
-
 	//ActorSerLinker初始化
 	actorSerLinker.InitLinker("actorSer", db, GateInfo.gateId)
 
@@ -306,7 +301,7 @@ func Looping() {
 				return
 			default:
 			}
-		case <-time.After(intervalLoopingTime):
+		case <-time.After(IntervalLoopingTime):
 			printer.TextInfo("ClientGoroutine Statistics", "Read-Goroutine", clientReadGoroutineNum.Load(), "Write-Goroutine", clientWriteGoroutineNum.Load())
 		}
 	}
