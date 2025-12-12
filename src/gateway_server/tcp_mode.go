@@ -110,7 +110,7 @@ func DoReadMsg(newConn *NewConnection) {
 	sliceBuffer := make([]byte, ReadStreamBufferSize)
 	cutList := list.New()
 	for {
-		//置下次读取的超时时间
+		//设置下次读取的超时时间
 		dLineTime := time.Now().Add(ConnReadTimeout)
 		err := (*(newConn.conn)).SetReadDeadline(dLineTime)
 		if err != nil {
