@@ -129,30 +129,30 @@ func (streanBuff *ReadStreamBufferObject) Init(way int) {
 }
 
 // 初始化NewConnection对象
-func (newConnection *NewConnection) Init(way int, socketConn *net.Conn, wSocketConn *websocket.Conn, typeofConn string) {
+func (netObj *NewConnection) Init(way int, socketConn *net.Conn, wSocketConn *websocket.Conn, typeofConn string) {
 	rsbObject := new(ReadStreamBufferObject)
 	rsbObject.Init(way)
-	newConnection.StreamBuffer = rsbObject
-	newConnection.wsConn = wSocketConn
-	newConnection.conn = socketConn
-	newConnection.connSession = 0
-	newConnection.connType = typeofConn
-	newConnection.connTime = time.Now()
-	newConnection.ReadBuf = make([]byte, ConnReadBufSize)
-	newConnection.writeChan = make(chan []byte, ConnWriteChanCaps)
-	newConnection.rwChannel = make(chan string, 2)
+	netObj.StreamBuffer = rsbObject
+	netObj.wsConn = wSocketConn
+	netObj.conn = socketConn
+	netObj.connSession = 0
+	netObj.connType = typeofConn
+	netObj.connTime = time.Now()
+	netObj.ReadBuf = make([]byte, ConnReadBufSize)
+	netObj.writeChan = make(chan []byte, ConnWriteChanCaps)
+	netObj.rwChannel = make(chan string, 2)
 
 	//设置ipString作为Goroutine的标识映射
 	if socketConn != nil {
-		newConnection.ipString = (*socketConn).RemoteAddr().String()
+		netObj.ipString = (*socketConn).RemoteAddr().String()
 	} else if wSocketConn != nil {
-		newConnection.ipString = (*wSocketConn).RemoteAddr().String()
+		netObj.ipString = (*wSocketConn).RemoteAddr().String()
 	}
 }
 
 // 往map中添加newConnection对应的writeChan
-func (newConnection *NewConnection) AddIntoGateMap(writeChan chan []byte) {
-	clientAddress := (*newConnection).RemoteAddr().String()
+func (netObj *NewConnection) AddIntoGateMap(writeChan chan []byte) {
+	clientAddress := (*netObj).RemoteAddr().String()
 	//printer.TextDebug("clientAddress = " + clientAddress)
 	GateInfo.sessionIdDistributionRecord += 1
 	sessionId := GateInfo.sessionIdDistributionRecord
@@ -171,17 +171,17 @@ func (newConnection *NewConnection) AddIntoGateMap(writeChan chan []byte) {
 	GateClientMap.Store(sessionId, sessionPtr)
 
 	//标记该连接的SessionID
-	newConnection.connSession = sessionId
+	netObj.connSession = sessionId
 	sessionPtr.session = sessionId
 	GateClientMapSize.Add(1)
 	printer.TextDebug("After add client to GateMap", "The Size", GateClientMapSize.Load())
 }
 
 // 移除map中的 writeChan,防止有数据继续写入而触发panic
-func (newConnection *NewConnection) ReduceFromGateMap() {
-	//clientAddress := (*newConnection).RemoteAddr().String()
-	if newConnection.connSession > 0 {
-		GateClientMap.Delete(newConnection.connSession)
+func (netObj *NewConnection) ReduceFromGateMap() {
+	//clientAddress := (*netObj).RemoteAddr().String()
+	if netObj.connSession > 0 {
+		GateClientMap.Delete(netObj.connSession)
 		GateClientMapSize.Add(-1)
 	}
 	printer.TextDebug("After reduce client to GateMap", "The Size", GateClientMapSize.Load())
