@@ -39,7 +39,7 @@ func main() {
 	//调试模式
 	CheckIsOpenDeBugMode(serName, processId)
 
-	//数据库管理池初始化
+	//数据库管理池初始化(mongo持久化 以及 memcache缓存)
 	database.MongoDBConnectClientInit(serName, processId)
 	database.MemCacheConnectClientInit(serName, processId)
 
