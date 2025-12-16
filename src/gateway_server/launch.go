@@ -38,10 +38,10 @@ func Run() {
 	//Start Server
 	BeginGateServer()
 	time.Sleep(2 * time.Second)
-	BeginLinkServer(webSerLinker)
-	BeginLinkServer(actorSerLinker)
-	BeginLinkServer(modularizedSerLinker)
-	BeginLinkServer(interactiveSerLinker)
+	BeginLinkServer(WebSerLinker)
+	BeginLinkServer(ActorSerLinker)
+	BeginLinkServer(ModularizedSerLinker)
+	BeginLinkServer(InteractiveSerLinker)
 
 	//Do Check With Loop
 	Looping()
@@ -117,16 +117,16 @@ func DoInit(db *sql.DB) bool {
 	}
 
 	//ActorSerLinker初始化
-	actorSerLinker.InitLinker("actorSer", db, GateInfo.gateId)
+	ActorSerLinker.InitLinker("actorSer", db, GateInfo.gateId)
 
 	//ModularizedSerLinker初始化
-	modularizedSerLinker.InitLinker("modularizedSer", db, GateInfo.gateId)
+	ModularizedSerLinker.InitLinker("modularizedSer", db, GateInfo.gateId)
 
 	//WebSerLinker初始化
-	webSerLinker.InitLinker("webSer", db, GateInfo.gateId)
+	WebSerLinker.InitLinker("webSer", db, GateInfo.gateId)
 
 	//InteractiveSerLinker初始化
-	interactiveSerLinker.InitLinker("interactiveSer", db, interactiveSerId)
+	InteractiveSerLinker.InitLinker("interactiveSer", db, interactiveSerId)
 
 	return true
 }
@@ -284,7 +284,7 @@ func BeginGateServer() {
 					go BeginGateServer()
 				}
 			}()
-			beginWebSocketSer()
+			BeginWebSocketSer()
 		}()
 	}
 }

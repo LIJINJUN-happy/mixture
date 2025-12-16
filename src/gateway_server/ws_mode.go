@@ -9,13 +9,13 @@ import (
 	"time"
 )
 
-func doRegister() {
+func DoRegister() {
 	http.HandleFunc("/ws", DoUpgradeWS) //升级成WS请求处理
 	http.HandleFunc("/test", TestFunc)  //测试例子
 }
 
-func beginWebSocketSer() {
-	doRegister()
+func BeginWebSocketSer() {
+	DoRegister()
 	address := strings.Join([]string{GateInfo.ip + ":", ""}, GateInfo.port)
 	var strBuild strings.Builder
 	addrLen := len(address)

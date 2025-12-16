@@ -54,10 +54,10 @@ var upgrade = websocket.Upgrader{
 }
 
 // 链接器对象
-var actorSerLinker = new(SerLinker)
-var interactiveSerLinker = new(SerLinker)
-var modularizedSerLinker = new(SerLinker)
-var webSerLinker = new(SerLinker)
+var ActorSerLinker = new(SerLinker)
+var InteractiveSerLinker = new(SerLinker)
+var ModularizedSerLinker = new(SerLinker)
+var WebSerLinker = new(SerLinker)
 
 // 白名单结构
 type WhiteList struct {

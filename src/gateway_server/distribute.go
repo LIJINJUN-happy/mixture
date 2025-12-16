@@ -49,13 +49,13 @@ func DoDistribute(cutList *list.List, sliceBuffer []byte, sourceSession uint32) 
 		//注意此时的data依旧是包含协议号的数据
 		switch protoSendSerName {
 		case "actor_server":
-			actorSerLinker.receiveChannel <- data
+			ActorSerLinker.receiveChannel <- data
 		case "modularized_server":
-			modularizedSerLinker.receiveChannel <- data
+			ModularizedSerLinker.receiveChannel <- data
 		case "interactive_server":
-			interactiveSerLinker.receiveChannel <- data
+			InteractiveSerLinker.receiveChannel <- data
 		case "web_server":
-			webSerLinker.receiveChannel <- data
+			WebSerLinker.receiveChannel <- data
 		case "gateway_server": //转发到对应客户端Write协程读取的chan中(发送给客户端前需要把SessionID前缀去掉)
 			sendTarSessionID := binary.BigEndian.Uint32(data[:SessionIdLen])
 			if client, resSearchFromMap := GateClientMap.Load(sendTarSessionID); resSearchFromMap {
