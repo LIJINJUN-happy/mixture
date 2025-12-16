@@ -18,7 +18,7 @@ type LoggerObj struct {
 	systemLog  bool                 //是否为系统日志对象（是的话覆盖os的输出）
 	osFile     *os.File             //输出对象
 	opts       *slog.HandlerOptions //设置
-	testLogger *slog.Logger         //日志对象(文本格式)
+	textLogger *slog.Logger         //日志对象(文本格式)
 	jsonLogger *slog.Logger         //日志对象(json格式)
 }
 
@@ -89,7 +89,7 @@ func (l *LoggerObj) InitLogger(logName, loggerPath string, sys bool) bool {
 	l.opts.Level = slog.Level(trueLv)
 
 	l.osFile = f
-	l.testLogger = slog.New(slog.NewTextHandler(f, l.opts))
+	l.textLogger = slog.New(slog.NewTextHandler(f, l.opts))
 	l.jsonLogger = slog.New(slog.NewJSONHandler(f, l.opts))
 	return true
 }
@@ -99,19 +99,19 @@ func SetLoggerObj(log *LoggerObj) {
 }
 
 func TextDebug(msg string, args ...any) {
-	systemLogObj.testLogger.Debug(msg, args...)
+	systemLogObj.textLogger.Debug(msg, args...)
 }
 
 func TextInfo(msg string, args ...any) {
-	systemLogObj.testLogger.Info(msg, args...)
+	systemLogObj.textLogger.Info(msg, args...)
 }
 
 func TextWarn(msg string, args ...any) {
-	systemLogObj.testLogger.Warn(msg, args...)
+	systemLogObj.textLogger.Warn(msg, args...)
 }
 
 func TextError(msg string, args ...any) {
-	systemLogObj.testLogger.Error(msg, args...)
+	systemLogObj.textLogger.Error(msg, args...)
 }
 
 func JsonDebug(msg string, args ...any) {
