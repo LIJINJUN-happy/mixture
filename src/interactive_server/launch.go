@@ -17,7 +17,7 @@ func Run() {
 		panic("InteractiveSer InitInfo Failed")
 	}
 
-	server_common.CreateServerMonitor(interactiveSer, interactiveSerProcessor)
+	interactiveSer.RegisterMonitorLogic(interactiveSerProcessor)
 }
 
 func interactiveSerProcessor(data []byte, proName string, gateId int, sessionID uint32) {

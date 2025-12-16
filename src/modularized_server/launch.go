@@ -16,7 +16,7 @@ func Run() {
 		panic("modularizedSer InitInfo Failed")
 	}
 
-	server_common.CreateServerMonitor(modularizedSer, modularizedSerProcessor)
+	modularizedSer.RegisterMonitorLogic(modularizedSerProcessor)
 }
 
 func modularizedSerProcessor(data []byte, proName string, gateId int, sessionID uint32) {

@@ -16,7 +16,7 @@ func Run() {
 	if !webSer.InitInfo("webSer", id) {
 		panic("webSer InitInfo Failed")
 	}
-	server_common.CreateServerMonitor(webSer, webSerProcessor)
+	webSer.RegisterMonitorLogic(webSerProcessor)
 }
 
 func webSerProcessor(data []byte, proName string, gateId int, sessionID uint32) {
