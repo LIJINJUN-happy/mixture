@@ -3,7 +3,7 @@ package user
 
 import (
 	"google.golang.org/protobuf/proto"
-	"mixture/proto/interior_pb/ipb"
+	"mixture/proto/mutual_pb/pb"
 	"mixture/src/common/printer"
 	"mixture/src/common/server_common"
 )
@@ -19,21 +19,18 @@ func ServerDown() error {
 	return nil
 }
 
-func Test(_ []byte, gateId int, sessionID uint32) error {
-	/*num := 0
+func Test(data []byte, gateId int, sessionID uint32) error {
+	num := int32(0)
 	pStruct := new(pb.C2STest)
 	errUnmarshal := proto.Unmarshal(data, pStruct)
 	if errUnmarshal == nil {
-		num = int(pStruct.Num) + 1
+		num = pStruct.Num + 1
 		printer.TextInfo("UseMode Test", "num", num)
-	}*/
-
-	ret := ipb.S2SHotFixModularizedSerSettings{HotFixAll: true}
+	}
+	ret := pb.S2CTestRet{Num: num}
 	sendData, e := proto.Marshal(&ret)
 	if e == nil {
-		server_common.DeliveryMsg(gateId, sessionID, "S2SHotFixModularizedSerSettings", sendData)
-		//printer.TrickLog("user", "S2SHotFixModularizedSerSettings", "S2SHotFixModularizedSerSettings' HotFixAll", true)
+		server_common.DeliveryMsg(gateId, sessionID, "S2CTestRet", sendData)
 	}
-
 	return nil
 }

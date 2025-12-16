@@ -1,45 +1,35 @@
 package web_server
 
 import (
-	"google.golang.org/protobuf/proto"
-	"mixture/proto/mutual_pb/pb"
 	"mixture/src/common/printer"
 	"mixture/src/common/server_common"
 	"os"
 	"strconv"
+	"sync"
 )
 
 var webSer = new(server_common.ServerInfo)
 
 func Run() {
+	defer func() {
+		if r := recover(); r != nil {
+			printer.PanicStack(r)
+		}
+	}()
+
 	id, _ := strconv.Atoi(os.Args[2])
 	if !webSer.InitInfo("webSer", id) {
 		panic("webSer InitInfo Failed")
 	}
-	webSer.RegisterMonitorLogic(webSerProcessor)
-}
 
-func webSerProcessor(data []byte, proName string, gateId int, sessionID uint32) {
-	printer.TextInfo("webSerProcessor", "proName", proName, "gateId", gateId, "sessionID", sessionID, "data", string(data))
-	/*pStruct := new(ipb.S2SHotFixWebSerSettings)
-	errUnmarshal := proto.Unmarshal(data, pStruct)
-	if errUnmarshal == nil {
-		printer.TextInfo("webSerProcessor", "pStruct.HotFixAll", pStruct.HotFixAll, "path", pStruct.SettingsInfo)
-	}*/
+	go webSer.RegisterMonitorLogic(server_common.SendProtoPack)
 
-	ret := pb.S2CTestRet{Num: int32(100)}
-	sendData, e := proto.Marshal(&ret)
-	if e == nil {
-		server_common.DeliveryMsg(gateId, sessionID, "S2CTestRet", sendData)
-	}
+	//加载模块功能（模块关闭同步）
+	var modWaitGroup sync.WaitGroup
 
-	/*cfg := settings.ConstCfg.Load()
-	if cfg != nil {
-		printer.TextInfo("cfg print Fix Before", "pcfg.Const.HeroInitList", cfg.Const.HeroInitList)
-	}
-	settings.DoLoad(false, pStruct.SettingsInfo)
-	cfg = settings.ConstCfg.Load()
-	if cfg != nil {
-		printer.TextInfo("cfg print Fix After", "pcfg.Const.HeroInitList", cfg.Const.HeroInitList)
-	}*/
+	//xxx系统
+	xxxMod := server_common.CreateMod("xxx", 2048, func() error { return nil }, func() error { return nil }, &modWaitGroup)
+	xxxMod.RegisterProtoHandleCaller("C2STestxxx", func(data []byte, gateId int, sessionID uint32) error { return nil })
+
+	modWaitGroup.Wait()
 }

@@ -1,35 +1,35 @@
 package modularized_server
 
 import (
-	"google.golang.org/protobuf/proto"
-	"mixture/proto/interior_pb/ipb"
+	"mixture/src/common/printer"
 	"mixture/src/common/server_common"
 	"os"
 	"strconv"
+	"sync"
 )
 
 var modularizedSer = new(server_common.ServerInfo)
 
 func Run() {
+	defer func() {
+		if r := recover(); r != nil {
+			printer.PanicStack(r)
+		}
+	}()
+
 	id, _ := strconv.Atoi(os.Args[2])
 	if !modularizedSer.InitInfo("modularizedSer", id) {
 		panic("modularizedSer InitInfo Failed")
 	}
 
-	modularizedSer.RegisterMonitorLogic(modularizedSerProcessor)
-}
+	modularizedSer.RegisterMonitorLogic(server_common.SendProtoPack)
 
-func modularizedSerProcessor(data []byte, proName string, gateId int, sessionID uint32) {
-	/*printer.TextInfo("modularizedSerProcessor", "proName", proName, "gateId", gateId, "sessionID", sessionID, "data", string(data))
-	pStruct := new(ipb.S2SHotFixModularizedSerSettings)
-	errUnmarshal := proto.Unmarshal(data, pStruct)
-	if errUnmarshal == nil {
-		printer.TextInfo("modularizedSerProcessor", "pStruct.HotFixAll", pStruct.HotFixAll)
-	}*/
+	//加载模块功能（模块关闭同步）
+	var modWaitGroup sync.WaitGroup
 
-	pbData := ipb.S2SHotFixInteractiveSerSettings{HotFixAll: true}
-	sendData, mRes := proto.Marshal(&pbData)
-	if mRes == nil {
-		server_common.DeliveryMsg(gateId, sessionID, "S2SHotFixInteractiveSerSettings", sendData)
-	}
+	//xxx系统
+	xxxMod := server_common.CreateMod("xxx", 2048, func() error { return nil }, func() error { return nil }, &modWaitGroup)
+	xxxMod.RegisterProtoHandleCaller("C2STestxxx", func(data []byte, gateId int, sessionID uint32) error { return nil })
+
+	modWaitGroup.Wait()
 }
