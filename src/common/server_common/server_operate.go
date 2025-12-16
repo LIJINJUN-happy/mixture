@@ -21,10 +21,10 @@ import (
 const sendChannelSize = 1024
 const receiveChannelSize = 1024
 
-// ServicePrt 通用服务指针（创建服务器结构体对象后赋值其地址给该指针）
+// 通用服务指针（创建服务器结构体对象后赋值其地址给该指针）
 var ServicePrt *ServerInfo
 
-// ServerInfo 服务结构体（包含服务定义的所有信息）
+// 服务结构体（包含服务定义的所有信息）
 type ServerInfo struct {
 	ServerName          string                             //服务名
 	ServerId            int                                //服务ID标识

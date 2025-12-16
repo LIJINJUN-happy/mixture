@@ -5,7 +5,7 @@ import (
 	"net"
 )
 
-// SerConnObj 网关连接到服务的连接结构体定义
+// 网关连接到服务的连接结构体定义
 type SerConnObj struct {
 	gateId         int       //连接过来的网关的ID标识
 	gateAddr       string    //连接过来的网关的IP地址
