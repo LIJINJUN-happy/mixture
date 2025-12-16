@@ -197,17 +197,17 @@ func (s *ServerInfo) RegisterMonitorLogic(f func([]byte, string, int, uint32)) {
 }
 
 // 启动服务
-func (sInfo *ServerInfo) BeginService(sCoon *SerConnObj) {
+func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 	defer func(si *ServerInfo, sObj *SerConnObj) {
 		if r := recover(); r != nil {
 			printer.PanicStack(r)
 		}
 		si.DeleteConnObj(sObj.gateAddr, sObj.GetGateId())
 		printer.TextInfo("BeginService Goroutine End........")
-	}(sInfo, sCoon)
+	}(s, sCoon)
 
-	go sInfo.Transmit(sCoon)
-	go sInfo.Dispose(sCoon)
+	go s.Transmit(sCoon)
+	go s.Dispose(sCoon)
 	time.Sleep(2 * time.Second)
 
 	//读取网关发送过来的数据
@@ -221,9 +221,9 @@ func (sInfo *ServerInfo) BeginService(sCoon *SerConnObj) {
 		num, readError := (*sCoon.gateSerConn).Read(readBuff)
 		if readError != nil {
 			if checkRes, descString := gateway_server.CheckIsCloseByRemote(readError); checkRes {
-				printer.TextInfo("GateSerConn Close With Client", "desc", descString, "ServerName", sInfo.ServerName)
+				printer.TextInfo("GateSerConn Close With Client", "desc", descString, "ServerName", s.ServerName)
 			} else {
-				printer.TextError("GateSerConn Read Error: ", "readError", readError.Error(), "ServerName", sInfo.ServerName)
+				printer.TextError("GateSerConn Read Error: ", "readError", readError.Error(), "ServerName", s.ServerName)
 			}
 			return
 		}
@@ -245,7 +245,7 @@ func (sInfo *ServerInfo) BeginService(sCoon *SerConnObj) {
 	}
 }
 
-func (sInfo *ServerInfo) Transmit(sCoon *SerConnObj) {
+func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 	defer func(s *SerConnObj) {
 		if r := recover(); r != nil {
 			printer.PanicStack(r)
@@ -263,7 +263,7 @@ func (sInfo *ServerInfo) Transmit(sCoon *SerConnObj) {
 					if num := gateway_server.DoPack(dataSlice, trueData, 1); num > 0 {
 						_, writeErr := (*sCoon.gateSerConn).Write(dataSlice[0:num])
 						if writeErr != nil {
-							printer.TextError("DialObject Write Fail", "writeErr", writeErr.Error(), "ServerName", sInfo.ServerName, "ServerId", sInfo.ServerId)
+							printer.TextError("DialObject Write Fail", "writeErr", writeErr.Error(), "ServerName", s.ServerName, "ServerId", s.ServerId)
 							return
 						}
 						//printer.TextDebug("DialObject Write Success ", "writeNum", writeNum, "dataSlice", string(dataSlice[0:writeNum]))
@@ -278,7 +278,7 @@ func (sInfo *ServerInfo) Transmit(sCoon *SerConnObj) {
 	}
 }
 
-func (sInfo *ServerInfo) Dispose(sCoon *SerConnObj) {
+func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
 	defer func(s *SerConnObj) {
 		if r := recover(); r != nil {
 			printer.PanicStack(r)
@@ -289,7 +289,7 @@ func (sInfo *ServerInfo) Dispose(sCoon *SerConnObj) {
 
 	//收取通信道传输过来切割好的数据包内容
 	dataIdxFrom := gateway_server.ProtoNumLen + gateway_server.SessionIdLen
-	fun := sInfo.GetDisposeFunc()
+	fun := s.GetDisposeFunc()
 	for {
 		select {
 		case receiveData := <-sCoon.receiveChannel:
@@ -330,9 +330,9 @@ func (sInfo *ServerInfo) Dispose(sCoon *SerConnObj) {
 				}
 
 				//检测一下是否存已存在对应的网关ID标识，不可重复，需要保证唯一ID标识
-				if !sInfo.CheckConnObjIsExist(gateID) {
+				if !s.CheckConnObjIsExist(gateID) {
 					sCoon.SetGateId(gateID) //设置网关标识
-					curGateSize := sInfo.AddConnObj(sCoon)
+					curGateSize := s.AddConnObj(sCoon)
 					printer.TextInfo("Dispose SYN GateId", "From GateLinker", linkerName, "GateID", gateID, "ConnObjMapSize", curGateSize)
 				} else {
 					//否者直接断开连接
