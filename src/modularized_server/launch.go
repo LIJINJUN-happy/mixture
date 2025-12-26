@@ -22,7 +22,7 @@ func Run() {
 		panic("modularizedSer InitInfo Failed")
 	}
 
-	go modularizedSer.RegisterMonitorLogic(server_common.SendProtoPack)
+	go modularizedSer.RegisterMonitorLogic(server_common.TranspondProtoPack)
 
 	//加载模块功能（模块关闭同步）
 	var modWaitGroup sync.WaitGroup

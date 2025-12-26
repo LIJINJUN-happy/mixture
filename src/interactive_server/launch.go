@@ -22,7 +22,7 @@ func Run() {
 		panic("InteractiveSer InitInfo Failed")
 	}
 
-	go interactiveSer.RegisterMonitorLogic(server_common.SendProtoPack)
+	go interactiveSer.RegisterMonitorLogic(server_common.TranspondProtoPack)
 
 	//加载模块功能（模块关闭同步）
 	var modWaitGroup sync.WaitGroup

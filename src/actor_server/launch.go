@@ -24,7 +24,7 @@ func Run() {
 	}
 
 	//创建进程监听服务以及进程接收的数据后的处理逻辑
-	go actorSer.RegisterMonitorLogic(server_common.SendProtoPack)
+	go actorSer.RegisterMonitorLogic(server_common.TranspondProtoPack)
 
 	//加载模块功能（模块关闭同步）
 	var modWaitGroup sync.WaitGroup

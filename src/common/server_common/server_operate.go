@@ -142,7 +142,7 @@ func (s *ServerInfo) GetDisposeFunc() func([]byte, string, int, uint32) {
 	return s.DisposeFunc
 }
 
-// 创建服务监视逻辑
+// 注册服务监视逻辑，所有连接到该服务进程的Gate的协议数据包都通过f函数处理
 func (s *ServerInfo) RegisterMonitorLogic(f func([]byte, string, int, uint32)) {
 	serName := s.ServerName
 	serId := s.ServerId
@@ -372,8 +372,8 @@ func (s *ServerInfo) TryCallServerFunc(data []byte, proName string) {
 }
 
 // 打包协议数据到对应的模块通道或者是执行服务处理逻辑
-func SendProtoPack(data []byte, proName string, gateId int, sessionID uint32) {
-	//printer.TextInfo("SendProtoPack", "proName", proName, "gateId", gateId, "sessionID", sessionID, "data", string(data))
+func TranspondProtoPack(data []byte, proName string, gateId int, sessionID uint32) {
+	//printer.TextInfo("TranspondProtoPack", "proName", proName, "gateId", gateId, "sessionID", sessionID, "data", string(data))
 	if modChan, ok := ProtoName2ModMap[proName]; ok {
 		info := new(ProtoPackInfo)
 		info.Data = data
