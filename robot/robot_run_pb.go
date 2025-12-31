@@ -172,7 +172,7 @@ func robotRecPBMsg(r *TestRobot, newConn *net.Conn) {
 			}
 
 			//处理完数据后设置下次读取的超时时间
-			dLineTime := time.Now().Add(600 * time.Second)
+			dLineTime := time.Now().Add(6000 * time.Second)
 			err := (*(newConn)).SetReadDeadline(dLineTime)
 			if err != nil {
 				fmt.Println("Socket SetReadDeadline", "Error", err.Error())
