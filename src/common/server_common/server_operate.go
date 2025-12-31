@@ -277,7 +277,7 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 			}
 		case <-loopTimer.Timer.C:
 			loopTimer.TimerStop()
-			if sCoon.gateSerConn != nil {
+			if sCoon.gateSerConn == nil {
 				return
 			}
 			loopTimer.Recount(nil) //重置定时器
