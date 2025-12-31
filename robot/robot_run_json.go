@@ -122,7 +122,7 @@ func robotRecJSMsg(r *TestRobot, newConn *net.Conn) {
 		readData := make([]byte, gateway_server.ReadStreamBufferSize)
 		num, readError := (*newConn).Read(readData)
 		if readError != nil {
-			panic("robotRecMsg :" + readError.Error())
+			fmt.Println("robotRecMsg :" + readError.Error())
 			return
 		} else {
 			fmt.Println("doReadMsg", "num", num, "message", string(readData[:num])) //处理接收到的数据
