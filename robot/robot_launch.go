@@ -25,10 +25,12 @@ type config struct {
 
 // TestRobot 机器人结构体
 type TestRobot struct {
-	uid        int       //机器人唯一标识
-	name       string    //机器人名字
-	curSendNum int       //机器人当前发送协议从次数
-	createTime time.Time //创建时间点
+	uid             int       //机器人唯一标识
+	name            string    //机器人名字
+	curSendNum      int       //机器人当前发送协议从次数
+	createTime      time.Time //创建时间点
+	lastSendMsgTime time.Time //最后一次发送消息的时间
+	lastReadMsgTime time.Time //最后一次接收消息的时间
 }
 
 var RBList = list.New()     // 机器人链表

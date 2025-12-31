@@ -22,8 +22,9 @@ func createPBRot() {
 			break
 		}
 		for i := 0; i < ConfigObj.CreateRobotNumOneSec; i++ {
-			robotName := strconv.Itoa(RBList.Len()) + connGateId
-			num, err := strconv.Atoi(robotName)
+			listNum := strconv.Itoa(RBList.Len())
+			robotName := "Robot_" + connGateId + "_" + listNum
+			num, err := strconv.Atoi(connGateId + "00" + listNum)
 			if err != nil {
 				panic(err)
 				return
@@ -36,7 +37,7 @@ func createPBRot() {
 			go robotSendPBMsg(r)
 
 			ret := RBList.PushBack(r)
-			if ret != nil && (RBList.Len() != ConfigObj.RobotNum) {
+			if (ret != nil) && (RBList.Len() < ConfigObj.RobotNum) {
 				continue
 			} else {
 				isFinishBreak = true
@@ -93,6 +94,7 @@ func robotSendPBMsg(r *TestRobot) {
 			_, ee := dail.Write(byteList[:num])
 			if ee == nil {
 				r.curSendNum += 1
+				r.lastSendMsgTime = time.Now()
 				//fmt.Println("name: "+r.name+" ,SendMsgNumSize: "+strconv.Itoa(n), " ,curSendMsgNum = ", r.curSendNum)
 			} else {
 				fmt.Println("name: "+r.name+" ,write error：", ee)
@@ -185,6 +187,11 @@ func robotRecPBMsg(r *TestRobot, newConn *net.Conn) {
 func robDealPBMsg(r *TestRobot, data []byte, needReadSize, curDataSize, num int) {
 	proNum := binary.BigEndian.Uint16(data[0:gateway_server.ProtoNumLen])
 	proString, resSearch := gateway_server.ProtocolDistributeInfo.ProtoNumMap[proNum]
+	r.lastReadMsgTime = time.Now()
+	diffWithSendTime := r.lastReadMsgTime.Sub(r.lastReadMsgTime)
+	fmt.Println("Robot", r.name, " diffWithSendTime: ", diffWithSendTime)
+
+	//分析接收到的协议
 	if resSearch {
 		switch proString {
 		case "S2CTestRet":
@@ -193,7 +200,6 @@ func robDealPBMsg(r *TestRobot, data []byte, needReadSize, curDataSize, num int)
 			//fmt.Println("S2CTestRet 's Num = ", t.Num, "robotName = ", r.name, "robotID = ", r.uid)
 		default:
 		}
-
 	} else {
 		fmt.Println(data, ", proNum = "+strconv.Itoa(int(proNum)), "Search Fail! ", "needReadSize = ", needReadSize, "curDataSize = ", curDataSize, "num = ", num)
 	}

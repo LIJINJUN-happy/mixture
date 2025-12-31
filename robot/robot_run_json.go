@@ -22,8 +22,9 @@ func createJSRot() {
 			break
 		}
 		for i := 0; i < ConfigObj.CreateRobotNumOneSec; i++ {
-			robotName := strconv.Itoa(RBList.Len()) + connGateId
-			num, err := strconv.Atoi(robotName)
+			listNum := strconv.Itoa(RBList.Len())
+			robotName := "Robot_" + connGateId + "_" + listNum
+			num, err := strconv.Atoi(connGateId + "00" + listNum)
 			if err != nil {
 				panic(err)
 				return
@@ -36,7 +37,7 @@ func createJSRot() {
 			go robotSendJSMsg(r)
 
 			ret := RBList.PushBack(r)
-			if ret != nil && (RBList.Len() != ConfigObj.RobotNum) {
+			if (ret != nil) && (RBList.Len() < ConfigObj.RobotNum) {
 				continue
 			} else {
 				isFinishBreak = true
@@ -93,6 +94,7 @@ func robotSendJSMsg(r *TestRobot) {
 			_, ee := dail.Write(byteList[:num])
 			if ee == nil {
 				r.curSendNum += 1
+				r.lastSendMsgTime = time.Now()
 				//fmt.Println("name: "+r.name+" ,SendMsgNumSize: "+strconv.Itoa(n), " ,curSendMsgNum = ", r.curSendNum)
 			} else {
 				fmt.Println("name: "+r.name+" ,write error：", ee)
@@ -148,7 +150,7 @@ func robotRecJSMsg(r *TestRobot, newConn *net.Conn) {
 					if diff <= num {                   //假如所需剩余读取数据的长度小于等于接收到的数据长度,直接形成一个包即可
 						num -= diff
 						compData = append(compData[:curDataSize], readData[:diff]...)
-						robDealJSMsg(compData[:needReadSize], diff, curDataSize, num)
+						robDealJSMsg(r, compData[:needReadSize], diff, curDataSize, num)
 
 						//切好一个包需要重置相关数据内容，然后继续开始切下一个包
 						headData = make([]byte, 2)
@@ -172,7 +174,7 @@ func robotRecJSMsg(r *TestRobot, newConn *net.Conn) {
 			}
 
 			//处理完数据后设置下次读取的超时时间
-			dLineTime := time.Now().Add(600 * time.Second)
+			dLineTime := time.Now().Add(6000 * time.Second)
 			err := (*(newConn)).SetReadDeadline(dLineTime)
 			if err != nil {
 				fmt.Println("Socket SetReadDeadline", "Error", err.Error())
@@ -182,9 +184,14 @@ func robotRecJSMsg(r *TestRobot, newConn *net.Conn) {
 	}
 }
 
-func robDealJSMsg(data []byte, needReadSize, curDataSize, num int) {
+func robDealJSMsg(r *TestRobot, data []byte, needReadSize, curDataSize, num int) {
 	proNum := binary.BigEndian.Uint16(data[0:gateway_server.ProtoNumLen])
 	proString, resSearch := gateway_server.ProtocolDistributeInfo.ProtoNumMap[proNum]
+	r.lastReadMsgTime = time.Now()
+	diffWithSendTime := r.lastReadMsgTime.Sub(r.lastReadMsgTime)
+	fmt.Println("Robot", r.name, " diffWithSendTime: ", diffWithSendTime)
+
+	//分析接收到的协议
 	if resSearch {
 		switch proString {
 		case "S2CTestRet":
