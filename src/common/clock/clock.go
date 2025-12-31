@@ -21,12 +21,12 @@ type TickerElement struct {
 	Timer       *time.Timer   //计时器(单次执行)
 	beginTime   time.Time     //开始时间
 	createTime  time.Time     //创建时间
-	intervalSec time.Duration //间隔时间秒数
+	intervalSec time.Duration //间隔时间
 	name        string        //定时器命名
 }
 
 // 开始计时器开启
-func TimerCreate(timerName string, tickType uint8, intervalSec int) *TickerElement {
+func TimerCreate(timerName string, tickType uint8, interval time.Duration) *TickerElement {
 	t := new(TickerElement)
 	t.Timer = nil
 	t.Ticker = nil
@@ -34,7 +34,7 @@ func TimerCreate(timerName string, tickType uint8, intervalSec int) *TickerEleme
 	t.name = timerName
 	t.status = UnStart
 	t.createTime = time.Now()
-	t.intervalSec = time.Duration(intervalSec) * time.Second
+	t.intervalSec = interval
 	return t
 }
 
