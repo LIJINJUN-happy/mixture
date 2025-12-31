@@ -2,6 +2,7 @@ package server_common
 
 import (
 	"errors"
+	"mixture/src/common/clock"
 	"mixture/src/common/printer"
 	"os"
 	"os/signal"
@@ -83,6 +84,8 @@ func CreateMod(modName string, chanSize int, modInitFunc, serverDownFunc func() 
 
 // 加载模块(每一个模块都是一个Go协程)
 func (mod *ServerModule) LoadMod(wg *sync.WaitGroup) {
+	modTimer := clock.TimerCreate(mod.modName, clock.OnceTimesSec, time.Hour)
+	modTimer.TimerStart()
 	for {
 		select {
 		case <-mod.closeChan: //监听服务器关闭通知
@@ -97,7 +100,9 @@ func (mod *ServerModule) LoadMod(wg *sync.WaitGroup) {
 			} else if modulePack, transModulePack := receiptData.(*ModulePackInfo); transModulePack {
 				mod.HandleModulePack(modulePack)
 			}
-		case <-time.After(time.Hour):
+		case <-modTimer.Timer.C:
+			modTimer.TimerStop()
+			modTimer.Recount(nil)
 		}
 	}
 }

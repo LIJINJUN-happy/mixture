@@ -10,6 +10,7 @@ import (
 	"io"
 	"mixture/proto/interior_json"
 	"mixture/proto/interior_pb/ipb"
+	"mixture/src/common/clock"
 	"mixture/src/common/printer"
 	"mixture/src/common/tools"
 	"mixture/src/database"
@@ -290,6 +291,9 @@ func BeginGateServer() {
 }
 
 func Looping() {
+	loopTimer := clock.TimerCreate("GateLoopTimer", clock.OnceTimesSec, IntervalLoopingTime)
+	loopTimer.TimerStart()
+
 	sigChannel := make(chan os.Signal, 1)
 	signal.Notify(sigChannel, syscall.SIGINT, syscall.SIGTERM)
 	for {
@@ -301,8 +305,10 @@ func Looping() {
 				return
 			default:
 			}
-		case <-time.After(IntervalLoopingTime):
+		case <-loopTimer.Timer.C:
 			printer.TextInfo("ClientGoroutine Statistics", "Read-Goroutine", clientReadGoroutineNum.Load(), "Write-Goroutine", clientWriteGoroutineNum.Load())
+			loopTimer.TimerStop()
+			loopTimer.Recount(nil)
 		}
 	}
 }

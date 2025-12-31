@@ -2,6 +2,7 @@ package gateway_server
 
 import (
 	"container/list"
+	"mixture/src/common/clock"
 	"mixture/src/common/printer"
 	"net"
 	"runtime/debug"
@@ -69,6 +70,9 @@ func DoWriteMsg(newConn *NewConnection) {
 		clientWriteGoroutineNum.Add(-1) //写协程数量同步变动减少
 	}()
 
+	writeTimer := clock.TimerCreate("DoWriteMsg", clock.OnceTimesSec, time.Hour)
+	writeTimer.TimerStart()
+
 	sendBuffer := make([]byte, ReadStreamBufferSize)
 	for {
 		select {
@@ -88,7 +92,9 @@ func DoWriteMsg(newConn *NewConnection) {
 					printer.TextDebug("Write Success", "Send Byte Size", strconv.Itoa(sendByteNum))
 				}
 			}
-		case <-time.After(time.Hour):
+		case <-writeTimer.Timer.C:
+			writeTimer.TimerStop()
+			writeTimer.Recount(nil)
 		}
 	}
 }
