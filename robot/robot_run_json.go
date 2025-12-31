@@ -188,7 +188,7 @@ func robDealJSMsg(r *TestRobot, data []byte, needReadSize, curDataSize, num int)
 	proNum := binary.BigEndian.Uint16(data[0:gateway_server.ProtoNumLen])
 	proString, resSearch := gateway_server.ProtocolDistributeInfo.ProtoNumMap[proNum]
 	r.lastReadMsgTime = time.Now()
-	diffWithSendTime := r.lastReadMsgTime.Sub(r.lastReadMsgTime).Milliseconds()
+	diffWithSendTime := r.lastReadMsgTime.Sub(r.lastSendMsgTime).Milliseconds()
 	fmt.Println("Robot", r.name, " diffWithSend Milliseconds: ", diffWithSendTime)
 
 	//分析接收到的协议
