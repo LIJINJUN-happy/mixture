@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"mixture/src/common/printer"
 	"net"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"time"
@@ -102,7 +103,7 @@ func DoReadMsg(newConn *NewConnection) {
 		close(newConn.rwChannel) //通知Write线程并关闭通知通道
 		(*newConn).Close()       //关闭套接字（关闭conn对象）
 		if r := recover(); r != nil {
-			printer.TextError("GateInfo.newConnPanic", "Recover", r)
+			printer.TextError("GateInfo.newConnPanic", "Recover", r, "Stack Trace", string(debug.Stack()))
 		}
 		clientReadGoroutineNum.Add(-1) //读协程数量同步变动减少
 	}()
