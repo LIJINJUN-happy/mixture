@@ -17,7 +17,7 @@ import (
 const ConnReadBufSize = 255               //每次读取客户端传来的数据长度大小
 const ConnWriteChanCaps = 5               //写信道缓存容量
 const ReadStreamBufferSize = 1024 * 5     //字节流读取对象的已读书缓存长度
-const MaxConnectClientNum = 5000          //最大客户端同时连接数量
+const MaxConnectClientNum = 10000         //最大客户端同时连接数量
 const messageType int = 1                 //webSocket的消息类型（默认为1文本类型）
 const maxGateRebuildListenTimes int8 = 10 //网关监听最大重启次数
 const splitSign = 124                     //字节流切割的标识符（‘|’）
