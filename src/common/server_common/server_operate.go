@@ -256,7 +256,7 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 	}(sCoon)
 
 	//创建高频定时器
-	loopTimer := clock.TimerCreate(s.ServerName, clock.OnceTimesSec, time.Millisecond)
+	loopTimer := clock.TimerCreate(s.ServerName, clock.OnceTimesSec, time.Millisecond*500)
 	loopTimer.TimerStart()
 
 	dataSlice := make([]byte, gateway_server.ReadStreamBufferSize)
