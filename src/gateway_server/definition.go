@@ -14,19 +14,19 @@ import (
 	"time"
 )
 
-const ConnReadBufSize = 255               //每次读取客户端传来的数据长度大小
-const ConnWriteChanCaps = 5               //写信道缓存容量
-const ReadStreamBufferSize = 1024 * 5     //字节流读取对象的已读书缓存长度
-const MaxConnectClientNum = 10000         //最大客户端同时连接数量
-const messageType int = 1                 //webSocket的消息类型（默认为1文本类型）
-const maxGateRebuildListenTimes int8 = 10 //网关监听最大重启次数
-const splitSign = 124                     //字节流切割的标识符（‘|’）
-const HeadLen int = 2                     //数据包头部长度（多少字节）,大端
-const ProtoNumLen int = 2                 //数据包中的协议占的字节长度,大端
-const SessionIdLen int = 4                //数据包来自哪个用户标识的字节长度（来自客户端或者是发送给客户端的时候必须有这个字段内容值,否者找不到发送目标）
-const appointLen uint16 = 556             //定长读取字节流的长度
-const channelBufferSize = 1024            //channelArray中每个chan的缓存大小
-const ConnReadTimeout = 900 * time.Second //读取用户超时间隔（为了防止长时间无响应的情况）
+const ConnReadBufSize = 255                //每次读取客户端传来的数据长度大小
+const ConnWriteChanCaps = 5                //写信道缓存容量
+const ReadStreamBufferSize = 1024 * 5      //字节流读取对象的已读书缓存长度
+const MaxConnectClientNum = 10000          //最大客户端同时连接数量
+const messageType int = 1                  //webSocket的消息类型（默认为1文本类型）
+const maxGateRebuildListenTimes int32 = 10 //网关监听最大重启次数
+const splitSign = 124                      //字节流切割的标识符（‘|’）
+const HeadLen int = 2                      //数据包头部长度（多少字节）,大端
+const ProtoNumLen int = 2                  //数据包中的协议占的字节长度,大端
+const SessionIdLen int = 4                 //数据包来自哪个用户标识的字节长度（来自客户端或者是发送给客户端的时候必须有这个字段内容值,否者找不到发送目标）
+const appointLen uint16 = 556              //定长读取字节流的长度
+const channelBufferSize = 1024             //channelArray中每个chan的缓存大小
+const ConnReadTimeout = 900 * time.Second  //读取用户超时间隔（为了防止长时间无响应的情况）
 const IntervalLoopingTime = 30 * time.Second
 const GoroutineSyncBreakSign = "_CLOSE"
 
@@ -96,7 +96,7 @@ type GateInformation struct {
 	workMode                    string        //tcp or ws(webSocket)
 	protocol                    string        //json or protobuf
 	maxConnSize                 int32         //接收客户端数据协程最大并发数量
-	rebuildListenTimes          int8          //重启次数（太多次直接Exit）
+	rebuildListenTimes          atomic.Int32  //重启次数（太多次直接Exit）
 	rebuildListenSec            time.Duration //重新启动监听延迟（监听panic后重启监听的间隔时间）
 	sessionIdDistributionRecord uint32        //当前派发的SessionID（每次有新连接进来都会派发一个新的sessionID作为标识）
 }

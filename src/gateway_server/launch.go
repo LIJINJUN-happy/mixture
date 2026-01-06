@@ -77,7 +77,7 @@ func DoInit(db *sql.DB) bool {
 
 	GateInfo.sessionIdDistributionRecord = 0
 	GateInfo.rebuildListenSec = 5
-	GateInfo.rebuildListenTimes = 0
+	GateInfo.rebuildListenTimes.Store(0)
 	GateInfo.maxConnSize = MaxConnectClientNum
 	GateInfo.gateId, _ = strconv.Atoi(os.Args[2])
 	checkAddressRes, address := database.GetGateIPAddressById(GateInfo.gateId, db)
@@ -258,7 +258,7 @@ func DealWithLinkerData(linker *SerLinker) {
 
 /*使用defer搭配递归解决监听线程的崩溃*/
 func BeginGateServer() {
-	if GateInfo.rebuildListenTimes >= maxGateRebuildListenTimes {
+	if GateInfo.rebuildListenTimes.Load() >= maxGateRebuildListenTimes {
 		printer.TextError("Rebuild ListenTimes Exceeded.")
 		os.Exit(101)
 	}
@@ -267,7 +267,7 @@ func BeginGateServer() {
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					GateInfo.rebuildListenTimes += 1
+					GateInfo.rebuildListenTimes.Add(1)
 					time.Sleep(GateInfo.rebuildListenSec * time.Second)
 					printer.TextWarn("重新启动tcp模式网关服务")
 					go BeginGateServer()
@@ -279,7 +279,7 @@ func BeginGateServer() {
 		go func() {
 			defer func() {
 				if r := recover(); r != nil {
-					GateInfo.rebuildListenTimes += 1
+					GateInfo.rebuildListenTimes.Add(1)
 					time.Sleep(GateInfo.rebuildListenSec * time.Second)
 					printer.TextWarn("重新启动WebSocket模式网关服务")
 					go BeginGateServer()
