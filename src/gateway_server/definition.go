@@ -98,7 +98,7 @@ type GateInformation struct {
 	maxConnSize                 int32         //接收客户端数据协程最大并发数量
 	rebuildListenTimes          atomic.Int32  //重启次数（太多次直接Exit）
 	rebuildListenSec            time.Duration //重新启动监听延迟（监听panic后重启监听的间隔时间）
-	sessionIdDistributionRecord uint32        //当前派发的SessionID（每次有新连接进来都会派发一个新的sessionID作为标识）
+	sessionIdDistributionRecord atomic.Uint32 //当前派发的SessionID（每次有新连接进来都会派发一个新的sessionID作为标识）
 }
 
 // 客户端的session元素
@@ -154,8 +154,7 @@ func (netObj *NewConnection) Init(way int, socketConn *net.Conn, wSocketConn *we
 func (netObj *NewConnection) AddIntoGateMap(writeChan chan []byte) {
 	clientAddress := (*netObj).RemoteAddr().String()
 	//printer.TextDebug("clientAddress = " + clientAddress)
-	GateInfo.sessionIdDistributionRecord += 1
-	sessionId := GateInfo.sessionIdDistributionRecord
+	sessionId := GateInfo.sessionIdDistributionRecord.Add(1)
 	if _, ok := GateClientMap.Load(sessionId); ok {
 		return
 	}

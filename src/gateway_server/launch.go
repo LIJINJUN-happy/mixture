@@ -75,7 +75,7 @@ func DoInit(db *sql.DB) bool {
 	}
 	printer.TextInfo("doInit", "WhiteList Init Map Info", (*WhiteListPtr).WhiteMap, "Active", (*WhiteListPtr).IsActive)
 
-	GateInfo.sessionIdDistributionRecord = 0
+	GateInfo.sessionIdDistributionRecord.Store(0)
 	GateInfo.rebuildListenSec = 5
 	GateInfo.rebuildListenTimes.Store(0)
 	GateInfo.maxConnSize = MaxConnectClientNum
