@@ -275,7 +275,7 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 					}
 				}
 			}
-		case <-loopTimer.Timer.C:
+		case <-loopTimer.Ticker.C:
 			if sCoon.gateSerConn == nil {
 				loopTimer.TimerStop() //退出关闭定时器
 				return
@@ -351,7 +351,7 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
 					printer.TextError("Dispose SYN GateId", "From GateLinker", linkerName, "Already Exist GateID", gateID)
 				}
 			}
-		case <-disposeTimer.Timer.C: //由于dispose协程内无法根据read或者write的报错触发error，只能根据conn是否被设为空来销毁协程
+		case <-disposeTimer.Ticker.C: //由于dispose协程内无法根据read或者write的报错触发error，只能根据conn是否被设为空来销毁协程
 			if sCoon.gateSerConn == nil {
 				disposeTimer.TimerStop() //退出暂停定时器
 				return
