@@ -255,8 +255,8 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 		printer.TextInfo("Transmit Goroutine End........")
 	}(sCoon)
 
-	//创建高频定时器
-	loopTimer := clock.TimerCreate(s.ServerName, clock.LoopingWithTime, time.Millisecond)
+	//创建定时器检测gate连接对象是否断开
+	loopTimer := clock.TimerCreate(s.ServerName, clock.LoopingWithTime, time.Second)
 	loopTimer.TimerStart()
 
 	dataSlice := make([]byte, gateway_server.ReadStreamBufferSize)
@@ -293,7 +293,7 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
 		printer.TextInfo("Dispose Goroutine End........")
 	}(sCoon)
 
-	disposeTimer := clock.TimerCreate(s.ServerName+"Dispose", clock.LoopingWithTime, time.Millisecond)
+	disposeTimer := clock.TimerCreate(s.ServerName+"Dispose", clock.LoopingWithTime, time.Second)
 	disposeTimer.TimerStart()
 
 	//收取通信道传输过来切割好的数据包内容
