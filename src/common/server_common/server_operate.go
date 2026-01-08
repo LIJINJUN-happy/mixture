@@ -20,6 +20,7 @@ import (
 
 const sendChannelSize = 1024
 const receiveChannelSize = 1024
+const TransmitDisposeTickerDuration = time.Millisecond * 500
 
 // 通用服务指针（创建服务器结构体对象后赋值其地址给该指针）
 var ServicePrt *ServerInfo
@@ -255,7 +256,7 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 	}(sCoon)
 
 	//创建定时器检测gate连接对象是否断开
-	loopTicker := time.NewTicker(time.Second)
+	loopTicker := time.NewTicker(TransmitDisposeTickerDuration)
 	defer loopTicker.Stop() //退出关闭定时器
 
 	dataSlice := make([]byte, gateway_server.ReadStreamBufferSize)
@@ -291,7 +292,7 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
 		printer.TextInfo("Dispose Goroutine End........")
 	}(sCoon)
 
-	disposeTicker := time.NewTicker(time.Second)
+	disposeTicker := time.NewTicker(TransmitDisposeTickerDuration)
 	defer disposeTicker.Stop() //退出暂停定时器
 
 	//收取通信道传输过来切割好的数据包内容
