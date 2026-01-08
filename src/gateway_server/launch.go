@@ -293,6 +293,7 @@ func BeginGateServer() {
 func Looping() {
 	loopTimer := clock.TimerCreate("GateLoopTimer", clock.OnceTimesSec, IntervalLoopingTime)
 	loopTimer.TimerStart()
+	defer loopTimer.TimerStop()
 
 	sigChannel := make(chan os.Signal, 1)
 	signal.Notify(sigChannel, syscall.SIGINT, syscall.SIGTERM)

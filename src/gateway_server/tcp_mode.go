@@ -72,6 +72,7 @@ func DoWriteMsg(newConn *NewConnection) {
 
 	writeTimer := clock.TimerCreate("DoWriteMsg", clock.OnceTimesSec, time.Hour)
 	writeTimer.TimerStart()
+	defer writeTimer.TimerStop()
 
 	sendBuffer := make([]byte, ReadStreamBufferSize)
 	for {

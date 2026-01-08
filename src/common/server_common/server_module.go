@@ -86,6 +86,8 @@ func CreateMod(modName string, chanSize int, modInitFunc, serverDownFunc func() 
 func (mod *ServerModule) LoadMod(wg *sync.WaitGroup) {
 	modTimer := clock.TimerCreate(mod.modName, clock.OnceTimesSec, time.Hour)
 	modTimer.TimerStart()
+	defer modTimer.TimerStop()
+
 	for {
 		select {
 		case <-mod.closeChan: //监听服务器关闭通知
