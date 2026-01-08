@@ -256,7 +256,7 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 	}(sCoon)
 
 	//创建高频定时器
-	loopTimer := clock.TimerCreate(s.ServerName, clock.OnceTimesSec, time.Millisecond)
+	loopTimer := clock.TimerCreate(s.ServerName, clock.LoopingWithTime, time.Millisecond)
 	loopTimer.TimerStart()
 
 	dataSlice := make([]byte, gateway_server.ReadStreamBufferSize)
@@ -276,11 +276,10 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 				}
 			}
 		case <-loopTimer.Timer.C:
-			loopTimer.TimerStop()
 			if sCoon.gateSerConn == nil {
+				loopTimer.TimerStop() //退出关闭定时器
 				return
 			}
-			loopTimer.Recount(nil) //重置定时器
 		}
 	}
 }
@@ -294,7 +293,7 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
 		printer.TextInfo("Dispose Goroutine End........")
 	}(sCoon)
 
-	disposeTimer := clock.TimerCreate(s.ServerName+"Dispose", clock.OnceTimesSec, time.Millisecond)
+	disposeTimer := clock.TimerCreate(s.ServerName+"Dispose", clock.LoopingWithTime, time.Millisecond)
 	disposeTimer.TimerStart()
 
 	//收取通信道传输过来切割好的数据包内容
@@ -352,12 +351,11 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
 					printer.TextError("Dispose SYN GateId", "From GateLinker", linkerName, "Already Exist GateID", gateID)
 				}
 			}
-		case <-disposeTimer.Timer.C:
-			disposeTimer.TimerStop()
+		case <-disposeTimer.Timer.C: //由于dispose协程内无法根据read或者write的报错触发error，只能根据conn是否被设为空来销毁协程
 			if sCoon.gateSerConn == nil {
-				return //由于dispose协程内无法根据read或者write的报错触发error，只能根据conn是否被设为空来销毁协程
+				disposeTimer.TimerStop() //退出暂停定时器
+				return
 			}
-			disposeTimer.Recount(nil)
 		}
 	}
 }
