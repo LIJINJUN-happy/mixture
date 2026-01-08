@@ -258,6 +258,7 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 	//创建定时器检测gate连接对象是否断开
 	loopTimer := clock.TimerCreate(s.ServerName, clock.LoopingWithTime, time.Second)
 	loopTimer.TimerStart()
+	defer loopTimer.TimerStop() //退出关闭定时器
 
 	dataSlice := make([]byte, gateway_server.ReadStreamBufferSize)
 	for {
@@ -277,7 +278,6 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 			}
 		case <-loopTimer.Ticker.C:
 			if sCoon.gateSerConn == nil {
-				loopTimer.TimerStop() //退出关闭定时器
 				return
 			}
 		}
@@ -295,6 +295,7 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
 
 	disposeTimer := clock.TimerCreate(s.ServerName+"Dispose", clock.LoopingWithTime, time.Second)
 	disposeTimer.TimerStart()
+	defer disposeTimer.TimerStop() //退出暂停定时器
 
 	//收取通信道传输过来切割好的数据包内容
 	dataIdxFrom := gateway_server.ProtoNumLen + gateway_server.SessionIdLen
@@ -353,7 +354,6 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
 			}
 		case <-disposeTimer.Ticker.C: //由于dispose协程内无法根据read或者write的报错触发error，只能根据conn是否被设为空来销毁协程
 			if sCoon.gateSerConn == nil {
-				disposeTimer.TimerStop() //退出暂停定时器
 				return
 			}
 		}
