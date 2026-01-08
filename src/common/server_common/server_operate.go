@@ -8,7 +8,6 @@ import (
 	"google.golang.org/protobuf/proto"
 	"mixture/proto/interior_json"
 	"mixture/proto/interior_pb/ipb"
-	"mixture/src/common/clock"
 	"mixture/src/common/printer"
 	"mixture/src/database"
 	"mixture/src/gateway_server"
@@ -256,9 +255,8 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 	}(sCoon)
 
 	//创建定时器检测gate连接对象是否断开
-	loopTimer := clock.TimerCreate(s.ServerName, clock.LoopingWithTime, time.Second)
-	loopTimer.TimerStart()
-	defer loopTimer.TimerStop() //退出关闭定时器
+	loopTicker := time.NewTicker(time.Second)
+	defer loopTicker.Stop() //退出关闭定时器
 
 	dataSlice := make([]byte, gateway_server.ReadStreamBufferSize)
 	for {
@@ -276,7 +274,7 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 					}
 				}
 			}
-		case <-loopTimer.Ticker.C:
+		case <-loopTicker.C:
 			if sCoon.gateSerConn == nil {
 				return
 			}
@@ -293,9 +291,8 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
 		printer.TextInfo("Dispose Goroutine End........")
 	}(sCoon)
 
-	disposeTimer := clock.TimerCreate(s.ServerName+"Dispose", clock.LoopingWithTime, time.Second)
-	disposeTimer.TimerStart()
-	defer disposeTimer.TimerStop() //退出暂停定时器
+	disposeTicker := time.NewTicker(time.Second)
+	defer disposeTicker.Stop() //退出暂停定时器
 
 	//收取通信道传输过来切割好的数据包内容
 	dataIdxFrom := gateway_server.ProtoNumLen + gateway_server.SessionIdLen
@@ -352,7 +349,7 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
 					printer.TextError("Dispose SYN GateId", "From GateLinker", linkerName, "Already Exist GateID", gateID)
 				}
 			}
-		case <-disposeTimer.Ticker.C: //由于dispose协程内无法根据read或者write的报错触发error，只能根据conn是否被设为空来销毁协程
+		case <-disposeTicker.C: //由于dispose协程内无法根据read或者write的报错触发error，只能根据conn是否被设为空来销毁协程
 			if sCoon.gateSerConn == nil {
 				return
 			}
