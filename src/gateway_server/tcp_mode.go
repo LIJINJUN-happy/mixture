@@ -49,7 +49,7 @@ func BeginTcpSer() {
 
 			//当有客户端连接进来就创一个newConnection对象,并创建一个goroutine来执行客户端请求和回应
 			newConn := new(NewConnection)
-			newConn.Init(1, &conn, nil, "tcp")
+			newConn.Init(ReadStreamBufferObjectWay, &conn, nil, "tcp")
 
 			//每个Actor连接读写分离
 			go DoWriteMsg(newConn)

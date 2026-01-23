@@ -16,7 +16,8 @@ import (
 
 const ConnReadBufSize = 255                //每次读取客户端传来的数据长度大小
 const ConnWriteChanCaps = 5                //写信道缓存容量
-const ReadStreamBufferSize = 1024 * 5      //字节流读取对象的已读书缓存长度
+const ReadStreamBufferSize = 5120          //字节流读取对象的已读书缓存长度(1024 * 5 )
+const ReadStreamBufferObjectWay uint8 = 1  //字节流切割方式
 const MaxConnectClientNum = 10000          //最大客户端同时连接数量
 const messageType int = 1                  //webSocket的消息类型（默认为1文本类型）
 const maxGateRebuildListenTimes int32 = 10 //网关监听最大重启次数
@@ -120,8 +121,8 @@ type ReadStreamBufferObject struct {
 }
 
 // ReadStreamBufferObject初始化方法
-func (streanBuff *ReadStreamBufferObject) Init(way int) {
-	streanBuff.readWay = uint8(way)
+func (streanBuff *ReadStreamBufferObject) Init(way uint8) {
+	streanBuff.readWay = way
 	streanBuff.headReadArray = make([]uint8, 0, HeadLen)
 	streanBuff.totalNeedReadLen = 0
 	streanBuff.curReadLen = 0
@@ -129,7 +130,7 @@ func (streanBuff *ReadStreamBufferObject) Init(way int) {
 }
 
 // 初始化NewConnection对象
-func (netObj *NewConnection) Init(way int, socketConn *net.Conn, wSocketConn *websocket.Conn, typeofConn string) {
+func (netObj *NewConnection) Init(way uint8, socketConn *net.Conn, wSocketConn *websocket.Conn, typeofConn string) {
 	rsbObject := new(ReadStreamBufferObject)
 	rsbObject.Init(way)
 	netObj.StreamBuffer = rsbObject

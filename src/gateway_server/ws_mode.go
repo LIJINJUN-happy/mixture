@@ -46,7 +46,7 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 	printer.TextInfo("Upgraded WebSocket Connection Successfully")
 
 	newConn := new(NewConnection)
-	newConn.Init(1, nil, wsConn, "ws")
+	newConn.Init(ReadStreamBufferObjectWay, nil, wsConn, "ws")
 	clientReadGoroutineNum.Add(1)
 	newConn.AddIntoGateMap(newConn.writeChan)
 

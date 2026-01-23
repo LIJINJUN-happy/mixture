@@ -168,7 +168,7 @@ func BeginLinkServer(sl *SerLinker) {
 
 		//读取字节流所需的结构对象以及容器
 		rsbObject := &ReadStreamBufferObject{
-			readWay:          uint8(1),
+			readWay:          ReadStreamBufferObjectWay,
 			headReadArray:    make([]uint8, 0, HeadLen),
 			totalNeedReadLen: 0,
 			curReadLen:       0,
@@ -239,7 +239,7 @@ func DealWithLinkerData(linker *SerLinker) {
 				}
 				continue
 			} else if kind == "slice" {
-				num := DoPack(dataSlice, anyData.([]byte), 1) //默认内部转发用方式1,包头+包体
+				num := DoPack(dataSlice, anyData.([]byte), ReadStreamBufferObjectWay) //默认内部转发用方式1,包头+包体
 				//printer.TextError("dealWithLinkerData", "DoPackResNum", num, "DataSlice", dataSlice[0:num])
 
 				if num > 0 {
@@ -344,7 +344,7 @@ func SendGateIDToRemoteSer(cn *net.Conn, linkerName string) {
 	binary.BigEndian.PutUint32(body[0:SessionIdLen], uint32(0))
 	binary.BigEndian.PutUint16(body[SessionIdLen:dataIdxFrom], uint16(protoNum))
 	cpSize := copy(body[dataIdxFrom:], dateByte)
-	num := DoPack(dataSlice, body, 1)
+	num := DoPack(dataSlice, body, ReadStreamBufferObjectWay)
 	n, _ := (*cn).Write(dataSlice[:num])
 	printer.TextInfo("SendGateIDToRemoteSer", "sendNum", n, "LinkerAddress", (*cn).RemoteAddr().String(), "PackSize", cpSize, "linkerName", linkerName)
 }
