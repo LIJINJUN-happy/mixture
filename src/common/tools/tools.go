@@ -2,7 +2,6 @@ package tools
 
 import (
 	"bufio"
-	"math/rand"
 	"os"
 	"strings"
 	"time"
@@ -43,10 +42,6 @@ func GetSysValueByKey(key string) string {
 	return ""
 }
 
-func GetRandNum(rMin, rMax int64) int64 {
-	return rand.Int63n(rMax) + rMin
-}
-
 // 获取当天零时整点时间戳
 func GetZeroTime() time.Time {
 	now := time.Now()    // 当前时间
@@ -78,21 +73,6 @@ func CheckDurDayWithTime(timestamp1, timestamp2 int64) int {
 	duration := time2.Sub(time1)
 	days := int(duration.Hours() / 24)
 	return days
-}
-
-// 随机UID
-func CreateUUid() int64 {
-	timeRand := time.Now().UnixNano()
-	seedRand := rand.Int63()
-	diff := int64(0)
-	if timeRand > seedRand {
-		diff = timeRand - seedRand
-	} else if seedRand > timeRand {
-		diff = seedRand - timeRand
-	} else {
-		diff = seedRand
-	}
-	return diff
 }
 
 // 检测这个时间戳是否属于今日
