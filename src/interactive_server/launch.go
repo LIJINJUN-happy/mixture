@@ -29,7 +29,7 @@ func Run() {
 
 	//xxx系统
 	xxxMod := server_common.CreateMod("interactiveSerxxx", 2048, func() error { return nil }, func() error { return nil }, &modWaitGroup)
-	xxxMod.RegisterProtoHandleCaller("C2STestxxx", func(data []byte, gateId int, sessionID uint32) error { return nil })
+	xxxMod.RegisterProtoHandleCaller("C2STestxxx", func(data []byte, gateId int, sessionID uint32) { return })
 
 	modWaitGroup.Wait()
 }

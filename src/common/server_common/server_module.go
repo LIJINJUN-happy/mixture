@@ -18,14 +18,14 @@ var InterfaceName2ModMap = make(map[string]chan interface{}) //外部接口模�
 
 // 服务模块
 type ServerModule struct {
-	modName          string                                                           //模块名称
-	closeChan        chan os.Signal                                                   //服务器关闭通知模块通道(信号通道)
-	receiptChan      chan interface{}                                                 //模块内接收数据的通道（发送给对应模块的数据都从这里接收）
-	LoggerObj        *printer.LoggerObj                                               //模块日志指针对象(模块日志区分)
-	ModInit          func() error                                                     //启动模块初始化处理函数
-	ServerDown       func() error                                                     //关闭服务器模块功能处理函数
-	HandleFuncMap    map[string]func(data []byte, gateId int, sessionID uint32) error //协议以及模块处理逻辑映射表
-	InterfaceFuncMap map[string]func(ags ...any) interface{}                          //外部接口以及模块处理逻辑映射表
+	modName          string                                                     //模块名称
+	closeChan        chan os.Signal                                             //服务器关闭通知模块通道(信号通道)
+	receiptChan      chan interface{}                                           //模块内接收数据的通道（发送给对应模块的数据都从这里接收）
+	LoggerObj        *printer.LoggerObj                                         //模块日志指针对象(模块日志区分)
+	ModInit          func() error                                               //启动模块初始化处理函数
+	ServerDown       func() error                                               //关闭服务器模块功能处理函数
+	HandleFuncMap    map[string]func(data []byte, gateId int, sessionID uint32) //协议以及模块处理逻辑映射表
+	InterfaceFuncMap map[string]func(ags ...any) interface{}                    //外部接口以及模块处理逻辑映射表
 }
 
 // 传输给模块通道的协议数据包（来自别的进程分发以及客户端传输）
@@ -50,7 +50,7 @@ func CreateMod(modName string, chanSize int, modInitFunc, serverDownFunc func() 
 	newMod.modName = modName
 	newMod.ModInit = modInitFunc
 	newMod.ServerDown = serverDownFunc
-	newMod.HandleFuncMap = make(map[string]func(data []byte, gateId int, sessionID uint32) error)
+	newMod.HandleFuncMap = make(map[string]func(data []byte, gateId int, sessionID uint32))
 	newMod.InterfaceFuncMap = make(map[string]func(ags ...any) interface{})
 	newMod.receiptChan = make(chan interface{}, chanSize)
 	newMod.closeChan = make(chan os.Signal, 1)
@@ -104,6 +104,8 @@ func (mod *ServerModule) LoadMod(wg *sync.WaitGroup) {
 				mod.HandleProtoPack(protoPack)
 			} else if modulePack, transModulePack := receiptData.(*ModulePackInfo); transModulePack {
 				mod.HandleModulePack(modulePack)
+			} else {
+				printer.TextError("LoadMod receiptChan Pack Error", "receiptData", receiptData)
 			}
 		case <-modTimer.C:
 			modTimer.Stop()
@@ -120,10 +122,7 @@ func (mod *ServerModule) HandleProtoPack(protoPack *ProtoPackInfo) {
 		}
 	}()
 	if callFunc, res := mod.HandleFuncMap[protoPack.ProName]; res {
-		handleRes := callFunc(protoPack.Data, protoPack.GateId, protoPack.SessionID)
-		if handleRes != nil {
-			printer.TextError("ModCall", "ServerName", ServicePrt.ServerName, "ServerId", ServicePrt.ServerId, "CallProto", protoPack.ProName, "Error", handleRes.Error())
-		}
+		callFunc(protoPack.Data, protoPack.GateId, protoPack.SessionID)
 	} else {
 		printer.TextError("ModCall", "ServerName", ServicePrt.ServerName, "ServerId", ServicePrt.ServerId, "MissCallProto", protoPack.ProName)
 	}
@@ -155,7 +154,7 @@ func (mod *ServerModule) HandleModulePack(modulePack *ModulePackInfo) {
 }
 
 // 注册协议对应的函数调用
-func (mod *ServerModule) RegisterProtoHandleCaller(proName string, f func(data []byte, gateId int, sessionID uint32) error) {
+func (mod *ServerModule) RegisterProtoHandleCaller(proName string, f func(data []byte, gateId int, sessionID uint32)) {
 	ProtoName2ModMap[proName] = mod.receiptChan
 	mod.HandleFuncMap[proName] = f
 }

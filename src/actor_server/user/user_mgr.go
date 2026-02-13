@@ -19,7 +19,7 @@ func ServerDown() error {
 	return nil
 }
 
-func Test(data []byte, gateId int, sessionID uint32) error {
+func Test(data []byte, gateId int, sessionID uint32) {
 	num := int32(0)
 	pStruct := new(pb.C2STest)
 	errUnmarshal := proto.Unmarshal(data, pStruct)
@@ -32,5 +32,4 @@ func Test(data []byte, gateId int, sessionID uint32) error {
 	if e == nil {
 		server_common.DeliveryMsg(gateId, sessionID, "S2CTestRet", sendData)
 	}
-	return nil
 }
