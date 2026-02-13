@@ -65,13 +65,13 @@ func GetNextDaySecond() time.Duration {
 }
 
 // 计算两个时间戳的相隔天数
-func CheckDurDayWithTime(timestamp1, timestamp2 int64) int {
+func CheckDurDayWithTime(timestamp1, timestamp2 int64) float64 {
 	time1 := time.Unix(timestamp1, 0)
 	time2 := time.Unix(timestamp2, 0)
 
 	// 计算两个时间之间的天数差
 	duration := time2.Sub(time1)
-	days := int(duration.Hours() / 24)
+	days := duration.Hours() / 24
 	return days
 }
 
