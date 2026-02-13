@@ -154,15 +154,15 @@ func (mod *ServerModule) HandleModulePack(modulePack *ModulePackInfo) {
 }
 
 // 注册协议对应的函数调用
-func (mod *ServerModule) RegisterProtoHandleCaller(proName string, f func(data []byte, gateId int, sessionID uint32)) {
+func (mod *ServerModule) RegisterProtoHandleCaller(proName string, protoHandleFunction func(data []byte, gateId int, sessionID uint32)) {
 	ProtoName2ModMap[proName] = mod.receiptChan
-	mod.HandleFuncMap[proName] = f
+	mod.HandleFuncMap[proName] = protoHandleFunction
 }
 
 // 注册同进程模块接口对应的函数调用
-func (mod *ServerModule) RegisterInterfaceHandleCaller(interfaceName string, f func(ags ...any) interface{}) {
+func (mod *ServerModule) RegisterInterfaceHandleCaller(interfaceName string, interfaceHandleFunction func(ags ...any) interface{}) {
 	InterfaceName2ModMap[interfaceName] = mod.receiptChan
-	mod.InterfaceFuncMap[interfaceName] = f
+	mod.InterfaceFuncMap[interfaceName] = interfaceHandleFunction
 }
 
 // 打包模块调用数据“同步”到对应的模块通道并等待返回结果
