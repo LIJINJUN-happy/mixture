@@ -84,7 +84,12 @@ func CreateMod(modName string, chanSize int, modInitFunc, serverDownFunc func() 
 // 加载模块(每一个模块都是一个Go协程)
 func (mod *ServerModule) LoadMod(wg *sync.WaitGroup) {
 	modTimer := time.NewTimer(time.Hour)
-	defer modTimer.Stop()
+	defer func() {
+		modTimer.Stop()
+		if err := recover(); err != nil {
+			printer.TextError("LoadMod", "ServerName", ServicePrt.ServerName, "ServerId", ServicePrt.ServerId, "modName", mod.modName, "Error", err)
+		}
+	}()
 
 	for {
 		select {
