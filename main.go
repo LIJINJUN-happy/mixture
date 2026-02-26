@@ -116,7 +116,7 @@ func CheckIsOpenDeBugMode(serName, processId string) {
 			//拿到端口后关闭数据库连接
 			dbCloseResult := netDB.Close()
 			if dbCloseResult != nil {
-				printer.TextError("netDB.Close With CheckIsOpenDeBugMode")
+				printer.TextError("netDB.Close With CheckIsOpenDeBugMode", "dbCloseResult", dbCloseResult.Error())
 			}
 
 			//根据端口启动debug模式
