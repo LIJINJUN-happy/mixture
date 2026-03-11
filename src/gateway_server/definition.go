@@ -155,6 +155,7 @@ func (netObj *NewConnection) Init(way uint8, socketConn *net.Conn, wSocketConn *
 func (netObj *NewConnection) AddIntoGateMap(writeChan chan []byte) {
 	clientAddress := (*netObj).RemoteAddr().String()
 	//printer.TextDebug("clientAddress = " + clientAddress)
+	//不用担心超过uint32后溢出的情况，Add方法在溢出时会自动回绕（wrap around），这是无符号整数在底层硬件上的标准行为
 	sessionId := GateInfo.sessionIdDistributionRecord.Add(1)
 	if _, ok := GateClientMap.Load(sessionId); ok {
 		return
