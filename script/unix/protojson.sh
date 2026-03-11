@@ -6,13 +6,10 @@ enterOutOfProjectDir(){
   cd ${dn}
   cd ..
   cd ..
-  cd ..
 }
 
 onlyInteriorPb(){
   enterOutOfProjectDir
-  # into dir mixture
-  cd mixture
   
   # into dir proto
   cd proto

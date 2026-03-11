@@ -2,8 +2,7 @@
 echo Begin To Fill allprtotocol.txt
 echo. 
 
-cd ../../../
-cd mixture
+cd ../../
 
 rem 开始提取协议和协议号内容
 cd ./proto/

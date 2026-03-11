@@ -5,13 +5,12 @@ enterOutOfProjectDir(){
   cd ${dn}
   cd ..
   cd ..
-  cd ..
 }
 
 onlyInteriorPb(){
   enterOutOfProjectDir
-  # into dir mixture/ ,Do Dispose with other xxx.proto file
-  cd mixture/proto/interior_pb/pb_src
+  # into dir ,Do Dispose with other xxx.proto file
+  cd proto/interior_pb/pb_src
   protoc -I . --go_out=../   ./element.proto
   protoc -I . --go_out=../   ./hotfix_settings.proto
 }
@@ -19,8 +18,8 @@ onlyInteriorPb(){
 mutualProtocol(){
   enterOutOfProjectDir
 
-  # into dir mixture/ ,Do Dispose with other xxx.proto file
-  cd mixture/proto/mutual_pb/pb_src
+  # into dir ,Do Dispose with other xxx.proto file
+  cd proto/mutual_pb/pb_src
   protoc -I . --go_out=../   ./test.proto
 
   cd ../../../

@@ -5,9 +5,9 @@ set /p doCmd=Enter A Number As An Argument :
 
 if %doCmd% EQU 1 (
     echo "Only InteriorPb"
-    cd ../../../
-    rem into dir mixture/ ,Do Dispose with other xxx.proto file
-    cd mixture/proto/interior_pb/pb_src
+    cd ../../
+    rem into dir ,Do Dispose with other xxx.proto file
+    cd proto/interior_pb/pb_src
     protoc -I . --go_out=../   ./element.proto
     protoc -I . --go_out=../   ./hotfix_settings.proto
 
@@ -19,10 +19,10 @@ if %doCmd% EQU 1 (
 
 if %doCmd% EQU 2 (
     echo "Mutual protocol"
-    cd ../../../
+    cd ../../
 
-    rem into dir mixture/ ,Do Dispose with other xxx.proto file
-    cd mixture/proto/mutual_pb/pb_src
+    rem into dir ,Do Dispose with other xxx.proto file
+    cd proto/mutual_pb/pb_src
     protoc -I . --go_out=../   ./test.proto
 	
 	rem 开始提取协议和协议号内容
