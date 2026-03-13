@@ -184,6 +184,8 @@ func SynchronousPack2Module(modName string, interfaceFuncName string, args []any
 				return nil
 			}
 		}
+	} else {
+		printer.TextError("SynchronousPack2Module_modNameError", "ModName", modName)
 	}
 	return nil
 }
@@ -198,5 +200,7 @@ func AsynchronousPack2Module(modName string, interfaceFuncName string, args []an
 			info.ReturnChan = nil
 			mod.receiptChan <- info
 		}
+	} else {
+		printer.TextError("AsynchronousPack2Module_modNameError", "ModName", modName)
 	}
 }
