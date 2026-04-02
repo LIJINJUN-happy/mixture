@@ -104,7 +104,6 @@ func CheckIsOpenDeBugMode(serName, processId string) {
 		defer func(sn, pId string) {
 			if quitErr := recover(); quitErr != nil {
 				printer.PanicStack(quitErr)
-				CheckIsOpenDeBugMode(sn, pId) //pprof 协程异常退出重启
 			}
 		}(serName, processId)
 
