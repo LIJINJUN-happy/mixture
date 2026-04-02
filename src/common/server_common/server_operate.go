@@ -39,7 +39,7 @@ type ServerInfo struct {
 }
 
 func (s *ServerInfo) InitInfo(serName string, id int) bool {
-	isOk, db := database.GetSQLiteConnDB()
+	db, isOk := database.GetSQLiteConnDB()
 	if isOk != nil {
 		return false
 	}

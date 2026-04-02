@@ -9,22 +9,19 @@ import (
 	"strings"
 )
 
-func GetSQLiteConnDB() (error, *sql.DB) {
+func GetSQLiteConnDB() (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", "net_sql.db")
 	if err != nil {
 		printer.TextError("SqlLite Database Open Failed" + err.Error())
-		return err, nil
-	} else {
-		version := ""
-		err = db.QueryRow("SELECT SQLITE_VERSION();").Scan(&version) // QueryRow() 执行查询，返回版本号
-		if err != nil {
-			printer.TextError("Database creation failed: " + err.Error())
-			return err, nil
-		}
-		// 连接成功，调试模式下打印出"database connected：版本号"
-		printer.TextDebug("SQLite Open Successful" + version)
+		return nil, err
 	}
-	return nil, db
+	version := ""
+	if err = db.QueryRow("SELECT SQLITE_VERSION();").Scan(&version); err != nil {
+		printer.TextError("Database creation failed: " + err.Error())
+		return nil, err
+	}
+	printer.TextDebug("SQLite Open Successful" + version)
+	return db, nil
 }
 
 func GetGateIPAddressById(gateId int, db *sql.DB) (bool, string) {

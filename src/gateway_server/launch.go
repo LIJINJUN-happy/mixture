@@ -25,7 +25,7 @@ import (
 
 // Gateway service: used to listen to client requests, accept protocols, decompose protocols, and send protocols
 func Run() {
-	isOk, db := database.GetSQLiteConnDB()
+	db, isOk := database.GetSQLiteConnDB()
 	if isOk != nil {
 		return
 	}
