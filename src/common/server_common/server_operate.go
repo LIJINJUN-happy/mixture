@@ -207,9 +207,12 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 		printer.TextInfo("BeginService Goroutine End........")
 	}(s, sCoon)
 
-	go s.Transmit(sCoon)
-	go s.Dispose(sCoon)
-	time.Sleep(2 * time.Second)
+	//开启两个协程分别处理该连接对象的发送和接收逻辑
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go s.Transmit(sCoon, &wg)
+	go s.Dispose(sCoon, &wg)
+	wg.Wait()
 
 	//读取网关发送过来的数据
 	readObj := new(gateway_server.ReadStreamBufferObject)
@@ -246,7 +249,7 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 	}
 }
 
-func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
+func (s *ServerInfo) Transmit(sCoon *SerConnObj, wg *sync.WaitGroup) {
 	defer func(s *SerConnObj) {
 		if r := recover(); r != nil {
 			printer.PanicStack(r)
@@ -254,11 +257,13 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 		s.Close("Transmit")
 		printer.TextInfo("Transmit Goroutine End........")
 	}(sCoon)
+	wg.Done()
 
 	//创建定时器检测gate连接对象是否断开
 	loopTicker := time.NewTicker(TransmitDisposeTickerDuration)
 	defer loopTicker.Stop() //退出关闭定时器
 
+	//收取通信道传输过来切割好的数据包内容
 	dataSlice := make([]byte, gateway_server.ReadStreamBufferSize)
 	for {
 		select {
@@ -283,7 +288,7 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 	}
 }
 
-func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
+func (s *ServerInfo) Dispose(sCoon *SerConnObj, wg *sync.WaitGroup) {
 	defer func(s *SerConnObj) {
 		if r := recover(); r != nil {
 			printer.PanicStack(r)
@@ -291,6 +296,7 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
 		s.Close("Dispose")
 		printer.TextInfo("Dispose Goroutine End........")
 	}(sCoon)
+	wg.Done()
 
 	disposeTicker := time.NewTicker(TransmitDisposeTickerDuration)
 	defer disposeTicker.Stop() //退出暂停定时器

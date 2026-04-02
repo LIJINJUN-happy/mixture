@@ -9,7 +9,6 @@ import (
 	"os"
 	"reflect"
 	"strings"
-	"unsafe"
 )
 
 // 协议格式：[[sessionID(4字节)][proNum(2字节)][data(xxx字节)]]
@@ -256,7 +255,7 @@ func SendMsg2Server(sessionId uint32, protoName string, data []byte) {
 		return
 	}
 	binary.BigEndian.PutUint16(newData[0:], p)
-	newData = append(newData[:unsafe.Sizeof(p)], data...)
+	newData = append(newData[:ProtoNumLen], data...)
 	printer.TextInfo("SendMsg2Server", "protoName", protoName, "data", data, "pnum", p, "newData", newData)
 
 	//调用派发协议接口送出协议

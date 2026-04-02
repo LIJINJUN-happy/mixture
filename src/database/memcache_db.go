@@ -38,7 +38,6 @@ func CreateMenCacheElement() *memcache.Client {
 	} else {
 		panic("MemCaChe CreateMenCacheElement Error: Ping Fail")
 	}
-	return nil
 }
 
 func GetMemCacheClient() *memcache.Client {
