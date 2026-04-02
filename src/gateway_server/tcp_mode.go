@@ -69,9 +69,6 @@ func DoWriteMsg(newConn *NewConnection) {
 		clientWriteGoroutineNum.Add(-1) //写协程数量同步变动减少
 	}()
 
-	writeTimer := time.NewTimer(time.Hour)
-	defer writeTimer.Stop()
-
 	sendBuffer := make([]byte, ReadStreamBufferSize)
 	for {
 		select {
@@ -91,9 +88,6 @@ func DoWriteMsg(newConn *NewConnection) {
 					printer.TextDebug("Write Success", "Send Byte Size", strconv.Itoa(sendByteNum))
 				}
 			}
-		case <-writeTimer.C:
-			writeTimer.Stop()
-			writeTimer.Reset(time.Hour)
 		}
 	}
 }
