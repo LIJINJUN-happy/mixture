@@ -17,7 +17,6 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"reflect"
 	"strconv"
 	"strings"
 	"syscall"
@@ -34,7 +33,7 @@ func Run() {
 	//Init Gate Config With DBObjectPtr
 	if err := DoInit(db); err != nil {
 		printer.TextError("Run", "DoInit Failed Err", err.Error())
-		return
+		os.Exit(1)
 	}
 
 	//Start Server
@@ -229,25 +228,23 @@ func DealWithLinkerData(linker *SerLinker) {
 	for {
 		select {
 		case anyData := <-linker.receiveChannel:
-			kind := reflect.TypeOf(anyData).Kind().String()
-			//printer.TextInfo("dealWithLinkerData: ", "reflect.TypeOf(anyData).Kind().String()", kind)
-			if kind == "string" {
-				if anyData.(string) == GoroutineSyncBreakSign {
+			switch analysis := anyData.(type) {
+			case string:
+				if analysis == GoroutineSyncBreakSign {
 					return
 				}
-				continue
-			} else if kind == "slice" {
-				num := DoPack(dataSlice, anyData.([]byte), ReadStreamBufferObjectWay) //默认内部转发用方式1,包头+包体
-				//printer.TextError("dealWithLinkerData", "DoPackResNum", num, "DataSlice", dataSlice[0:num])
-
-				if num > 0 {
-					_, writeErr := (*linker.serConn).Write(dataSlice[0:num])
-					if writeErr != nil {
-						printer.TextError("GateWay DialObject Write Fail", "writeErr", writeErr.Error())
-					} else {
-						//printer.TextDebug("GateWay DialObject Write Success", "writeNum", strconv.Itoa(writeNum), "dataSlice", string(dataSlice[0:num]))
-					}
+			case []byte:
+				num := DoPack(dataSlice, analysis, ReadStreamBufferObjectWay) //默认内部转发用方式1,包头+包体
+				if num <= 0 {
+					break
 				}
+				if _, writeErr := (*linker.serConn).Write(dataSlice[0:num]); writeErr != nil {
+					printer.TextError("GateWay DialObject Write Fail", "writeErr", writeErr)
+				} else {
+					printer.TextDebug("GateWay DialObject Write Success", "writeNum", num, "dataSlice", string(dataSlice[0:num]))
+				}
+			default:
+				printer.TextDebug("DealWithLinkerData", "unknown type", analysis)
 			}
 		}
 	}
