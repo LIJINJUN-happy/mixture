@@ -10,8 +10,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"mixture/src/common/printer"
 	"mixture/src/common/tools"
+	"time"
 )
 
+var mongoOpTimeout = 5 * time.Second
 var writeMongoClient *mongo.Client = nil
 var readMongoClient *mongo.Client = nil
 var maxPoolSize, minPoolSize = uint64(100), uint64(0)
@@ -44,12 +46,17 @@ func MongoDBConnectClientInit(serName, processId string) {
 func CreateReadWriteMongoClient(opc *options.ClientOptions) *mongo.Client {
 	opc.SetMaxPoolSize(maxPoolSize)
 	opc.SetMinPoolSize(minPoolSize)
-	client, err := mongo.Connect(context.TODO(), opc)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	client, err := mongo.Connect(ctx, opc)
 	if err != nil {
 		printer.TextError("createReadWriteMongoPool Write Connect failed: " + err.Error())
 	}
 	if client != nil {
-		err = client.Ping(context.TODO(), readpref.Primary()) // ping一下WriteMongoDB测试下是否调通
+		pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer pingCancel()
+		err = client.Ping(pingCtx, readpref.Primary()) // ping一下WriteMongoDB测试下是否调通
 		if err != nil {
 			printer.TextError("createReadWriteMongoPool Write Ping failed: " + err.Error())
 		}
@@ -81,7 +88,9 @@ func MongoInsert(fileDBName, collectionName string, bJsonInterface interface{}) 
 	//选择fileDBName文档数据库的collectionName集合
 	resultString := ""
 	collection := m.Database(fileDBName).Collection(collectionName)
-	insertResult, err := collection.InsertOne(context.TODO(), bJsonInterface)
+	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
+	defer cancel()
+	insertResult, err := collection.InsertOne(ctx, bJsonInterface)
 	if err != nil {
 		return false, fmt.Sprintf("ERRO:%v", err.Error())
 	}
@@ -101,7 +110,9 @@ func MongoDelete(fileDBName, collectionName string, bJsonInterface interface{}) 
 
 	resultString := ""
 	collection := m.Database(fileDBName).Collection(collectionName)
-	deleteResult, err := collection.DeleteOne(context.TODO(), bJsonInterface)
+	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
+	defer cancel()
+	deleteResult, err := collection.DeleteOne(ctx, bJsonInterface)
 	if err != nil {
 		return false, fmt.Sprintf("ERRO:%v", err.Error())
 	}
@@ -121,7 +132,9 @@ func MongoUpdate(fileDBName, collectionName string, bJsonOldInterface, bJsonNewI
 
 	resultString := ""
 	collection := m.Database(fileDBName).Collection(collectionName)
-	updateResult, err := collection.UpdateOne(context.TODO(), bJsonOldInterface, bJsonNewInterface)
+	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
+	defer cancel()
+	updateResult, err := collection.UpdateOne(ctx, bJsonOldInterface, bJsonNewInterface)
 	if err != nil {
 		return false, fmt.Sprintf("ERRO:%v", err.Error())
 	}
@@ -149,7 +162,9 @@ func MongoFindOne(fileDBName, collectionName string, searchInterface interface{}
 
 	//查找符合索引条件的结果
 	var singleResult bson.M
-	mSingleResult := collection.FindOne(context.TODO(), searchInterface).Decode(&singleResult)
+	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
+	defer cancel()
+	mSingleResult := collection.FindOne(ctx, searchInterface).Decode(&singleResult)
 	if mSingleResult == nil {
 		return true, "", singleResult
 
@@ -174,7 +189,9 @@ func MongoCountLine(fileDBName, collectionName string) (bool, string, int64) {
 		return false, fmt.Sprintf("Database(%v).Collection(%v) Fail", fileDBName, collectionName), 0
 	}
 
-	count, e := collection.CountDocuments(context.TODO(), bson.D{})
+	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
+	defer cancel()
+	count, e := collection.CountDocuments(ctx, bson.D{})
 	if e != nil {
 		return false, fmt.Sprintf("fileDBName(%v).collection(%v).CountDocuments() Fail", fileDBName, collectionName), 0
 	}

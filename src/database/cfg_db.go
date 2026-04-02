@@ -29,7 +29,7 @@ func GetSQLiteConnDB() (error, *sql.DB) {
 
 func GetGateIPAddressById(gateId int, db *sql.DB) (bool, string) {
 	address := ""
-	err := db.QueryRow("SELECT gatewaySerAddress FROM \"gatewaySerConfig\" where gatewaySerId==" + strconv.Itoa(gateId)).Scan(&address)
+	err := db.QueryRow(`SELECT gatewaySerAddress FROM "gatewaySerConfig" WHERE gatewaySerId=?`, gateId).Scan(&address)
 	//printer.TextDebug("GetGateIPAddressById", "Get Address", address, " By GateID", gateId)
 	if (err == nil) && (len(address) >= 1) {
 		return true, address
@@ -39,7 +39,7 @@ func GetGateIPAddressById(gateId int, db *sql.DB) (bool, string) {
 
 func GetGatePortNumById(gateId int, db *sql.DB) (bool, int) {
 	portString := ""
-	queryErr := db.QueryRow("SELECT gatewaySerPort FROM \"gatewaySerConfig\" where gatewaySerId==" + strconv.Itoa(gateId)).Scan(&portString)
+	queryErr := db.QueryRow(`SELECT gatewaySerPort FROM "gatewaySerConfig" WHERE gatewaySerId=?`, gateId).Scan(&portString)
 	//printer.TextDebug("GetGatePortNumById", "Get Port", portString, " By GateID", gateId)
 	port, err := strconv.Atoi(portString)
 	if (queryErr == nil) && (err == nil) && (port > 0) {
@@ -50,7 +50,7 @@ func GetGatePortNumById(gateId int, db *sql.DB) (bool, int) {
 
 func GetInteractiveSerIdByGateId(gateId int, db *sql.DB) (bool, int) {
 	interactiveSerId := ""
-	queryErr := db.QueryRow("SELECT interactiveSerId FROM \"gatewaySerConfig\" where gatewaySerId==" + strconv.Itoa(gateId)).Scan(&interactiveSerId)
+	queryErr := db.QueryRow(`SELECT interactiveSerId FROM "gatewaySerConfig" WHERE gatewaySerId=?`, gateId).Scan(&interactiveSerId)
 	//printer.TextDebug("GetInteractiveSerIdByGateId", "Get InteractiveSerId", interactiveSerId, " By GateID", gateId)
 	sId, err := strconv.Atoi(interactiveSerId)
 	if (queryErr == nil) && (err == nil) {
