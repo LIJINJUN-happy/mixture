@@ -108,7 +108,7 @@ func CheckIsOpenDeBugMode(serName, processId string) {
 		}(serName, processId)
 
 		resPort := ""
-		res, netDB := database.GetSQLiteConnDB()
+		netDB, res := database.GetSQLiteConnDB()
 		if res == nil {
 			resPort = database.GetDeBugModePort(serName, processId, netDB)
 
