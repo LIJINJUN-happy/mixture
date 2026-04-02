@@ -257,7 +257,6 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj, wg *sync.WaitGroup) {
 		s.Close("Transmit")
 		printer.TextInfo("Transmit Goroutine End........")
 	}(sCoon)
-	wg.Done()
 
 	//创建定时器检测gate连接对象是否断开
 	loopTicker := time.NewTicker(TransmitDisposeTickerDuration)
@@ -265,6 +264,7 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj, wg *sync.WaitGroup) {
 
 	//收取通信道传输过来切割好的数据包内容
 	dataSlice := make([]byte, gateway_server.ReadStreamBufferSize)
+	wg.Done()
 	for {
 		select {
 		case transmitData := <-sCoon.sendChannel:
@@ -296,7 +296,6 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, wg *sync.WaitGroup) {
 		s.Close("Dispose")
 		printer.TextInfo("Dispose Goroutine End........")
 	}(sCoon)
-	wg.Done()
 
 	disposeTicker := time.NewTicker(TransmitDisposeTickerDuration)
 	defer disposeTicker.Stop() //退出暂停定时器
@@ -304,6 +303,7 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, wg *sync.WaitGroup) {
 	//收取通信道传输过来切割好的数据包内容
 	dataIdxFrom := gateway_server.ProtoNumLen + gateway_server.SessionIdLen
 	fun := s.GetDisposeFunc()
+	wg.Done()
 	for {
 		select {
 		case receiveData := <-sCoon.receiveChannel:
