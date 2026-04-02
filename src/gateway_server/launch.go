@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"google.golang.org/protobuf/proto"
 	"io"
 	"mixture/proto/interior_json"
@@ -31,7 +32,8 @@ func Run() {
 	}
 
 	//Init Gate Config With DBObjectPtr
-	if !DoInit(db) {
+	if err := DoInit(db); err != nil {
+		printer.TextError("Run", "DoInit Failed Err", err.Error())
 		return
 	}
 
@@ -47,7 +49,7 @@ func Run() {
 	Looping()
 }
 
-func DoInit(db *sql.DB) bool {
+func DoInit(db *sql.DB) error {
 	defer func(sq *sql.DB) {
 		closeError := sq.Close() //调用db.Close() 函数关闭数据库
 		if closeError != nil {
@@ -69,8 +71,7 @@ func DoInit(db *sql.DB) bool {
 			WhiteListPtr.IsActive = true
 		}
 	} else {
-		printer.TextError("doInit", "whiteIPListDefaultStatus Error", "whiteIPListDefaultStatus", whiteStatus)
-		return false
+		return fmt.Errorf("whiteIPListDefaultStatus Error Status &v", whiteStatus)
 	}
 	printer.TextInfo("doInit", "WhiteList Init Map Info", (*WhiteListPtr).WhiteMap, "Active", (*WhiteListPtr).IsActive)
 
@@ -81,15 +82,13 @@ func DoInit(db *sql.DB) bool {
 	GateInfo.gateId, _ = strconv.Atoi(os.Args[2])
 	checkAddressRes, address := database.GetGateIPAddressById(GateInfo.gateId, db)
 	if !checkAddressRes {
-		printer.TextError("doInit", "GetGateIPAddressById Result", "Failed", "GateId", GateInfo.gateId)
-		return false
+		return fmt.Errorf("GetGateIPAddressById Failed, GateId=%v", GateInfo.gateId)
 	} else {
 		GateInfo.ip = address
 	}
 	checkPortRes, port := database.GetGatePortNumById(GateInfo.gateId, db)
 	if !checkPortRes {
-		printer.TextError("doInit", "GetGatePortNumById Result", "Failed", "GateId", GateInfo.gateId)
-		return false
+		return fmt.Errorf("doInit", "GetGatePortNumById Failed, GateId=%v", GateInfo.gateId)
 	} else {
 		GateInfo.port = strconv.Itoa(port)
 	}
@@ -102,18 +101,17 @@ func DoInit(db *sql.DB) bool {
 	//查找interactiveSer的ID标识
 	checkInteractiveSerIdRes, interactiveSerId := database.GetInteractiveSerIdByGateId(GateInfo.gateId, db)
 	if !checkInteractiveSerIdRes {
-		printer.TextError("doInit", "checkInteractiveSerIdRes", checkInteractiveSerIdRes, "GateId", GateInfo.gateId)
-		return false
+		return fmt.Errorf("checkInteractiveSerIdRes=%v, GateId=%v", checkInteractiveSerIdRes, GateInfo.gateId)
 	}
 
 	//根据执行参数选择网络模式以及使用的协议方式
 	checkWorkMode := GateInfo.workMode == "tcp" || GateInfo.workMode == "ws"
 	checkProtocol := GateInfo.protocol == "json" || GateInfo.protocol == "protobuf"
 	if !checkWorkMode {
-		panic("\nArgs Error With GateWay's WorkMode: " + GateInfo.workMode + " , Should Be 'tcp' or 'ws'")
+		return errors.New("\nArgs Error With GateWay's WorkMode: " + GateInfo.workMode + " , Should Be 'tcp' or 'ws'")
 	}
 	if !checkProtocol {
-		panic("\nArgs Error With GateWay's Protocol: " + GateInfo.protocol + " , Should Be 'json' or 'protobuf'")
+		return errors.New("\nArgs Error With GateWay's Protocol: " + GateInfo.protocol + " , Should Be 'json' or 'protobuf'")
 	}
 
 	//ActorSerLinker初始化
@@ -128,7 +126,7 @@ func DoInit(db *sql.DB) bool {
 	//InteractiveSerLinker初始化
 	InteractiveSerLinker.InitLinker("interactiveSer", db, interactiveSerId)
 
-	return true
+	return nil
 }
 
 /*链接xxx服务进程,收发gatewaySer和xxxSer之间的数据信息*/
