@@ -14,7 +14,7 @@ var cacheTimeOut = 15 * time.Second     //操作超时时长
 
 func MemCacheConnectClientInit(serName, processId string) {
 	if serName != "robot_test" && serName != "gateway_server" {
-		res, netDB := GetSQLiteConnDB()
+		netDB, res := GetSQLiteConnDB()
 		if res == nil {
 			defer func() {
 				if netDB.Close() != nil {
