@@ -59,7 +59,11 @@ func DoDistribute(cutList *list.List, sliceBuffer []byte, sourceSession uint32) 
 			sendTarSessionID := binary.BigEndian.Uint32(data[:SessionIdLen])
 			if client, resSearchFromMap := GateClientMap.Load(sendTarSessionID); resSearchFromMap {
 				if session, changeTypeRes := client.(*clientSession); changeTypeRes {
-					session.clientBuffChannel <- data[SessionIdLen:]
+					select {
+					case session.clientBuffChannel <- data[SessionIdLen:]:
+					default:
+						printer.TextWarn("Client Buffer Full, Drop Msg", "SessionID", sendTarSessionID) //缓冲区满了
+					}
 				}
 			} else if sendTarSessionID == 0 {
 				printer.TextWarn("DoDistribute Check serFunc", "protoName", protoName)
