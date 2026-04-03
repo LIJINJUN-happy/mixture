@@ -69,14 +69,14 @@ func DoDistribute(cutList *list.List, sliceBuffer []byte, sourceSession uint32) 
 			InteractiveSerLinker.receiveChannel <- data
 		case "web_server":
 			WebSerLinker.receiveChannel <- data
-		case "gateway_server": //转发到对应客户端Write协程读取的chan中(发送给客户端前需要把SessionID前缀去掉)
-			sendTarSessionID := binary.BigEndian.Uint32(data[:SessionIdLen])
+		case "gateway_server":
+			sendTarSessionID := binary.BigEndian.Uint32(data[:SessionIdLen]) //根据sendTarSessionID转发到对应客户端Write协程读取的chan中
 			if client, resSearchFromMap := GateClientMap.Load(sendTarSessionID); resSearchFromMap {
 				if session, changeTypeRes := client.(*clientSession); changeTypeRes {
 					select {
-					case session.clientBuffChannel <- data[SessionIdLen:]:
+					case session.clientBuffChannel <- data:
 					default:
-						printer.TextWarn("Client Buffer Full, Drop Msg", "SessionID", sendTarSessionID) //缓冲区满了
+						printer.TextWarn("DoDistribute", "Client Buffer Full, Drop Msg SessionID", sendTarSessionID) //缓冲区满了
 					}
 				}
 			} else if sendTarSessionID == 0 {
