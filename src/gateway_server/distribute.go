@@ -50,11 +50,13 @@ func DoDistribute(cutList *list.List, sliceBuffer []byte, sourceSession uint32) 
 		protoName, canFindProtoName := ProtocolDistributeInfo.ProtoNumMap[elementProtoNum]
 		if !canFindProtoName {
 			printer.TextWarn("DoDistribute", "protoName is nil, elementProtoNum", elementProtoNum)
+			DistributeDataPool.Put(bufPtr)
 			continue
 		}
 		protoSendSerName, canFindProtoSendSerName := ProtocolDistributeInfo.ProtoDistributeMap[protoName]
 		if !canFindProtoSendSerName {
 			printer.TextWarn("DoDistribute", "protoSendSerName is nil, protoName", protoName)
+			DistributeDataPool.Put(bufPtr)
 			continue
 		}
 		//printer.TextInfo("doDistribute", "protoName: ", protoName, "protoSendSerName: ", protoSendSerName)
@@ -86,6 +88,7 @@ func DoDistribute(cutList *list.List, sliceBuffer []byte, sourceSession uint32) 
 				case "xxxxx":
 				default:
 				}
+				DistributeDataPool.Put(bufPtr)
 			}
 		default:
 		}
