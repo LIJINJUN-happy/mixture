@@ -35,6 +35,13 @@ var ProtoPackInfoPool = sync.Pool{
 	},
 }
 
+// 模块通信包对象池
+var ModulePackInfoPool = sync.Pool{
+	New: func() interface{} {
+		return new(ModulePackInfo)
+	},
+}
+
 // 传输给模块通道的协议数据包（来自别的进程分发以及客户端传输）
 type ProtoPackInfo struct {
 	ProName   string //协议名字
@@ -124,7 +131,9 @@ func (mod *ServerModule) LoadMod(wg *sync.WaitGroup) {
 // 处理协议数据包（来源：进程或者客户端）
 func (mod *ServerModule) HandleProtoPack(protoPack *ProtoPackInfo) {
 	defer func() {
-		ProtoPackInfoPool.Put(protoPack) // 放回对象池
+		// 协议数据包放回对象池，减少每次都new新包的开销
+		ProtoPackInfoPool.Put(protoPack)
+
 		if err := recover(); err != nil {
 			printer.TextError("HandleProtoPack", "ServerName", ServicePrt.ServerName, "ServerId", ServicePrt.ServerId, "modName", mod.modName, "Error", err)
 		}
@@ -139,6 +148,11 @@ func (mod *ServerModule) HandleProtoPack(protoPack *ProtoPackInfo) {
 // 处理接口数据包（来源：同进程下不同模块）
 func (mod *ServerModule) HandleModulePack(modulePack *ModulePackInfo) {
 	defer func() {
+		// 清理引用后再放入池中，防止内存泄漏
+		modulePack.ArgsList = nil
+		modulePack.ReturnChan = nil
+		ModulePackInfoPool.Put(modulePack)
+
 		if err := recover(); err != nil {
 			printer.TextError("HandleModulePack", "ServerName", ServicePrt.ServerName, "ServerId", ServicePrt.ServerId, "modName", mod.modName, "Error", err)
 		}
@@ -177,7 +191,7 @@ func (mod *ServerModule) RegisterInterfaceHandleCaller(interfaceName string, int
 func SynchronousPack2Module(modName string, interfaceFuncName string, args []any) interface{} {
 	if sm, ok := ServerModMgr.Load(modName); ok {
 		if mod, res := sm.(*ServerModule); res {
-			info := new(ModulePackInfo)
+			info := ModulePackInfoPool.Get().(*ModulePackInfo)
 			info.InterfaceName = interfaceFuncName
 			info.ArgsList = args
 			info.ReturnChan = make(chan interface{}, 1)
@@ -202,7 +216,7 @@ func SynchronousPack2Module(modName string, interfaceFuncName string, args []any
 func AsynchronousPack2Module(modName string, interfaceFuncName string, args []any) {
 	if sm, ok := ServerModMgr.Load(modName); ok {
 		if mod, res := sm.(*ServerModule); res {
-			info := new(ModulePackInfo)
+			info := ModulePackInfoPool.Get().(*ModulePackInfo)
 			info.InterfaceName = interfaceFuncName
 			info.ArgsList = args
 			info.ReturnChan = nil
