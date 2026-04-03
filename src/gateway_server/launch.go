@@ -171,7 +171,7 @@ func BeginLinkServer(sl *SerLinker) {
 			curReadLen:       0,
 			byteData:         make([]byte, 0, ReadStreamBufferSize),
 		}
-		serData := make([]byte, 255)
+		serData := make([]byte, ConnReadBufSize)
 		sliceBuffer := make([]byte, ReadStreamBufferSize)
 		cutList := list.New()
 

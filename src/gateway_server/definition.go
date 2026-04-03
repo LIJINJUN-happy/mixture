@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-const ConnReadBufSize = 255                //每次读取客户端传来的数据长度大小
+const ConnReadBufSize = 4096               //每次读取客户端传来的数据长度大小
 const ConnWriteChanCaps = 64               //写信道缓存容量
 const ReadStreamBufferSize = 5120          //字节流读取对象的已读书缓存长度(1024 * 5 )
 const ReadStreamBufferObjectWay uint8 = 1  //字节流切割方式
