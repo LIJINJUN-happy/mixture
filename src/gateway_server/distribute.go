@@ -34,7 +34,12 @@ func DoDistribute(cutList *list.List, sliceBuffer []byte, sourceSession uint32) 
 
 		//池化获取内存
 		dataLen := element - beginIdx + extraLen
-		bufPtr := DistributeDataPool.Get().(*[]byte)
+		poolObject := DistributeDataPool.Get()
+		bufPtr, ok := poolObject.(*[]byte)
+		if !ok {
+			printer.TextError("DoDistribute", "Err", "DistributeDataPool Get Fail")
+			return
+		}
 		data := (*bufPtr)[:dataLen]
 
 		if extraLen == 0 {
