@@ -20,8 +20,9 @@ func InitPrinterMgr() {
 	PrintMgrPtr.logMapPtr = new(sync.Map) //（key:日志名称,val:日志对象指针）
 	PrintMgrPtr.curZeroDate = tools.GetZeroTime()
 	go func(p *printerMgr) {
-		for {
-			time.Sleep(5 * time.Second)
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
 			p.CheckIsNeedCreateNewDate()
 		}
 	}(PrintMgrPtr)
