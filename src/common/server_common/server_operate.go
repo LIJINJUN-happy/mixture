@@ -388,7 +388,7 @@ func (s *ServerInfo) TryCallServerFunc(data []byte, proName string) {
 func TranspondProtoPack(data []byte, proName string, gateId int, sessionID uint32) {
 	//printer.TextInfo("TranspondProtoPack", "proName", proName, "gateId", gateId, "sessionID", sessionID, "data", string(data))
 	if modChan, ok := ProtoName2ModMap[proName]; ok {
-		info := new(ProtoPackInfo)
+		info := ProtoPackInfoPool.Get().(*ProtoPackInfo)
 		info.Data = data
 		info.GateId = gateId
 		info.ProName = proName

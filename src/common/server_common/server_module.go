@@ -28,6 +28,13 @@ type ServerModule struct {
 	InterfaceFuncMap map[string]func(ags ...any) interface{}                    //外部接口以及模块处理逻辑映射表
 }
 
+// 协议通信包对象池
+var ProtoPackInfoPool = sync.Pool{
+	New: func() interface{} {
+		return new(ProtoPackInfo)
+	},
+}
+
 // 传输给模块通道的协议数据包（来自别的进程分发以及客户端传输）
 type ProtoPackInfo struct {
 	ProName   string //协议名字
@@ -117,6 +124,7 @@ func (mod *ServerModule) LoadMod(wg *sync.WaitGroup) {
 // 处理协议数据包（来源：进程或者客户端）
 func (mod *ServerModule) HandleProtoPack(protoPack *ProtoPackInfo) {
 	defer func() {
+		ProtoPackInfoPool.Put(protoPack) // 放回对象池
 		if err := recover(); err != nil {
 			printer.TextError("HandleProtoPack", "ServerName", ServicePrt.ServerName, "ServerId", ServicePrt.ServerId, "modName", mod.modName, "Error", err)
 		}
