@@ -9,7 +9,16 @@ import (
 	"os"
 	"reflect"
 	"strings"
+	"sync"
 )
+
+// 用于网关路由分发的对象池，避免频繁 GC
+var DistributeDataPool = sync.Pool{
+	New: func() interface{} {
+		buf := make([]byte, ReadStreamBufferSize)
+		return &buf
+	},
+}
 
 // 协议格式：[[sessionID(4字节)][proNum(2字节)][data(xxx字节)]]
 // 该函数负责数据的判断与转发(sourceSession 用于区别是来自服务器内部还是客户端,假如来自客户端需要添加上相关的字段内容再做转发)
@@ -22,7 +31,12 @@ func DoDistribute(cutList *list.List, sliceBuffer []byte, sourceSession uint32) 
 	for iterator := cutList.Front(); iterator != nil; iterator = iterator.Next() {
 		element := iterator.Value.(int)
 		//printer.TextDebug("doDistribute", "beginIdx", beginIdx, "element", element, "data", sliceBuffer[beginIdx:element])
-		data := make([]byte, element-beginIdx+extraLen)
+
+		//池化获取内存
+		dataLen := element - beginIdx + extraLen
+		bufPtr := DistributeDataPool.Get().(*[]byte)
+		data := (*bufPtr)[:dataLen]
+
 		if extraLen == 0 {
 			copy(data, sliceBuffer[beginIdx:element]) //其他服务进程传输过来的协议数据包
 		} else if extraLen > 0 {

@@ -243,6 +243,12 @@ func DealWithLinkerData(linker *SerLinker) {
 				} else {
 					printer.TextDebug("GateWay DialObject Write Success", "writeNum", num, "dataSlice", string(dataSlice[0:num]))
 				}
+
+				// 发送完毕后，将切片恢复到原始容量并放回对象池(DoDistribute 在分配协议内容时使用了池化获取内存对象,所以这里需要放回池中以供下次使用)
+				if cap(analysis) == ReadStreamBufferSize {
+					analysis = analysis[:ReadStreamBufferSize]
+					DistributeDataPool.Put(&analysis)
+				}
 			default:
 				printer.TextDebug("DealWithLinkerData", "unknown type", analysis)
 			}
