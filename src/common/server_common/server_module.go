@@ -198,10 +198,12 @@ func SynchronousPack2Module(modName string, interfaceFuncName string, args []any
 			mod.receiptChan <- info
 
 			//开始等待同步调用的数据返回
+			timer := time.NewTimer(ModCallerTimeOut)
+			defer timer.Stop()
 			select {
 			case retData := <-info.ReturnChan:
 				return retData
-			case <-time.After(ModCallerTimeOut):
+			case <-timer.C:
 				printer.TextError("SynchronousPack2Module_TimeOut", "ModName", modName, "CallFunc", interfaceFuncName, "CallArgs", args)
 				return nil
 			}

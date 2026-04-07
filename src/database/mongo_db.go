@@ -65,17 +65,37 @@ func CreateReadWriteMongoClient(opc *options.ClientOptions) *mongo.Client {
 }
 
 func GetReadMongoClient() *mongo.Client {
-	/*if err := readMongoClient.Ping(context.TODO(), readpref.Primary()); err != nil {
-		readMongoClient = CreateReadWriteMongoClient(readClientOptions)
-	}*/
 	return readMongoClient
 }
 
 func GetWriteMongoClient() *mongo.Client {
-	/*if err := writeMongoClient.Ping(context.TODO(), readpref.Primary()); err != nil {
-		writeMongoClient = CreateReadWriteMongoClient(writeClientOptions)
-	}*/
 	return writeMongoClient
+}
+
+// StartMongoHealthCheck 后台定期 ping，连接断开时自动重建客户端，不影响业务调用路径
+func StartMongoHealthCheck(interval time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+		for range ticker.C {
+			if readMongoClient != nil && readClientOptions != nil {
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				if err := readMongoClient.Ping(ctx, readpref.Primary()); err != nil {
+					printer.TextWarn("MongoHealthCheck", "ReadClient ping fail, reconnecting", err.Error())
+					readMongoClient = CreateReadWriteMongoClient(readClientOptions)
+				}
+				cancel()
+			}
+			if writeMongoClient != nil && writeClientOptions != nil {
+				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+				if err := writeMongoClient.Ping(ctx, readpref.Primary()); err != nil {
+					printer.TextWarn("MongoHealthCheck", "WriteClient ping fail, reconnecting", err.Error())
+					writeMongoClient = CreateReadWriteMongoClient(writeClientOptions)
+				}
+				cancel()
+			}
+		}
+	}()
 }
 
 // 插入文档

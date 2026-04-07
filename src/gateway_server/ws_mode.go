@@ -87,7 +87,10 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 		} else {
 			//处理接收到的数据
 			//printer.TextInfo("doUpgradeWS", "num", num, "message", string(newConn.ReadBuf[:num]))
-			DealBufferData(newConn, num, cutList, sliceBuffer)
+			if !DealBufferData(newConn, num, cutList, sliceBuffer) {
+				printer.TextWarn("DoUpgradeWS", "Illegal packet, closing connection", (*newConn).RemoteAddr().String())
+				return
+			}
 		}
 	}
 }

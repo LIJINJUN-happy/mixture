@@ -4,41 +4,57 @@ import (
 	"bytes"
 	"container/list"
 	"encoding/binary"
+	"mixture/src/common/printer"
 )
 
-// 处理服务进程连接对象发送过来的协议
-func DealBufferData(newConn *NewConnection, readNum int, l *list.List, sliceBuffer []byte) {
-	DoSplit(newConn.StreamBuffer, newConn.ReadBuf, readNum, l, sliceBuffer)
+// 处理服务进程连接对象发送过来的协议，返回 false 表示收到非法包，调用方应断开连接
+func DealBufferData(newConn *NewConnection, readNum int, l *list.List, sliceBuffer []byte) bool {
+	if !DoSplit(newConn.StreamBuffer, newConn.ReadBuf, readNum, l, sliceBuffer) {
+		return false
+	}
 	DoDistribute(l, sliceBuffer[0:], newConn.connSession)
+	return true
 }
 
 // DoSplit /* 三种读取字节流切割方式： 1.根据字节长度来读取数据   2.根据标记来切割字节流  3定长读取，每个包都是固定长度*/
-func DoSplit(j *ReadStreamBufferObject, byteSlice []byte, readNum int, list *list.List, sliceBuffer []byte) {
+func DoSplit(j *ReadStreamBufferObject, byteSlice []byte, readNum int, list *list.List, sliceBuffer []byte) bool {
 	switch j.readWay {
 	case 1:
-		DoSplitByReadHeadLen(j, byteSlice, readNum, list, sliceBuffer, 0)
+		return DoSplitByReadHeadLen(j, byteSlice, readNum, list, sliceBuffer, 0)
 	case 2:
 		DoSplitBySign(j, byteSlice, readNum, list, sliceBuffer, 0)
 	case 3:
 		DoSplitByAppointLen(j, byteSlice, readNum, list, sliceBuffer, 0)
 	default:
 	}
+	return true
 }
 
 // 1.根据字节长度来读取数据(注意切割的时候有可能是包头被切割了,需要判断下包头字节问题,除非包头是1字节)
-func DoSplitByReadHeadLen(j *ReadStreamBufferObject, byteSlice []byte, readNum int, list *list.List, sliceBuffer []byte, beginIdx int) {
+// 返回 false 表示包头声明的长度超过允许上限，调用方应断开连接
+func DoSplitByReadHeadLen(j *ReadStreamBufferObject, byteSlice []byte, readNum int, list *list.List, sliceBuffer []byte, beginIdx int) bool {
 	if j.totalNeedReadLen == 0 {
 		if len(byteSlice) >= HeadLen {
 			//需要判断包头是否被切割了（不仅仅只考虑包体拼接）
 			diffLen := HeadLen - len(j.headReadArray) //头包剩余所需长度
 			j.headReadArray = append(j.headReadArray, byteSlice[:diffLen]...)
 			j.totalNeedReadLen = binary.BigEndian.Uint16(j.headReadArray[:HeadLen])
+
+			// 包长校验：超过上限视为非法包，重置状态并通知断连
+			if j.totalNeedReadLen > MaxPacketBodySize {
+				printer.TextWarn("DoSplitByReadHeadLen", "Oversized packet declared", j.totalNeedReadLen, "limit", MaxPacketBodySize)
+				j.totalNeedReadLen, j.curReadLen = 0, 0
+				j.byteData = j.byteData[0:0]
+				j.headReadArray = j.headReadArray[0:0]
+				return false
+			}
+
 			byteSlice = byteSlice[diffLen:]
 			readNum -= diffLen
 		} else {
 			//不足够读取整个头包长度（可能有1字节被分成下次Read的数据中）
 			j.headReadArray = append(j.headReadArray, byteSlice...)
-			return
+			return true
 		}
 	}
 	packageNeedLen := j.totalNeedReadLen - j.curReadLen //该完整包剩余所需读取字节数
@@ -63,9 +79,10 @@ func DoSplitByReadHeadLen(j *ReadStreamBufferObject, byteSlice []byte, readNum i
 		byteSlice = byteSlice[packageNeedLen:]
 
 		if readNum != int(packageNeedLen) {
-			DoSplitByReadHeadLen(j, byteSlice, readNum-int(packageNeedLen), list, sliceBuffer, beginIdx) //剩余的数据大于等于所需的(先拼接好传到发送通信到等待传输去Actor服务进程，然后用递归继续执行剩余的数据拼接新的数据)
+			return DoSplitByReadHeadLen(j, byteSlice, readNum-int(packageNeedLen), list, sliceBuffer, beginIdx) //剩余的数据大于等于所需的(先拼接好传到发送通信到等待传输去Actor服务进程，然后用递归继续执行剩余的数据拼接新的数据)
 		}
 	}
+	return true
 }
 
 // 2.根据标记来切割字节流(这里用splitSign常量表示,该方法缺点是前端发送的数据中带有该切割符就会让该方法切割错误)

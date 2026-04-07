@@ -16,6 +16,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // 启动所有服务器进程，参数(1)进程服务名称 (2)编号ID（用于区分同类型服务的id编号） 其余参数.....
@@ -41,6 +42,7 @@ func main() {
 
 	//数据库管理池初始化(mongo持久化 以及 memcache缓存)
 	database.MongoDBConnectClientInit(serName, processId)
+	database.StartMongoHealthCheck(30 * time.Second)
 	database.MemCacheConnectClientInit(serName, processId)
 
 	defer func() {

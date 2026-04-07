@@ -137,7 +137,10 @@ func DoReadMsg(newConn *NewConnection) {
 		} else {
 			//处理接收到的数据
 			printer.TextDebug("doReadMsg", "num", num, "message", string(newConn.ReadBuf[:num]))
-			DealBufferData(newConn, num, cutList, sliceBuffer)
+			if !DealBufferData(newConn, num, cutList, sliceBuffer) {
+				printer.TextWarn("DoReadMsg", "Illegal packet, closing connection", (*newConn).RemoteAddr().String())
+				return
+			}
 		}
 	}
 }
