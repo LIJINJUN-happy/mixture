@@ -328,7 +328,7 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, wg *sync.WaitGroup) {
 					errUnmarshal := proto.Unmarshal(dataSlice[dataIdxFrom:], gatePbStruct)
 					if errUnmarshal != nil {
 						printer.PanicStack(errUnmarshal)
-						break
+						return //连接既不被识别也不被关闭，白占资源直到对端断开
 					}
 					gateID = int(gatePbStruct.GateId)
 					linkerName = gatePbStruct.SerName
@@ -337,7 +337,7 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, wg *sync.WaitGroup) {
 					errUnmarshal := json.Unmarshal(dataSlice[dataIdxFrom:], jsStruct)
 					if errUnmarshal != nil {
 						printer.PanicStack(errUnmarshal)
-						break
+						return
 					}
 					gateID = int(jsStruct.GateId)
 					linkerName = jsStruct.SerName
