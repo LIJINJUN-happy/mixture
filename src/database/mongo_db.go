@@ -10,12 +10,13 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"mixture/src/common/printer"
 	"mixture/src/common/tools"
+	"sync/atomic"
 	"time"
 )
 
 var mongoOpTimeout = 5 * time.Second
-var writeMongoClient *mongo.Client = nil
-var readMongoClient *mongo.Client = nil
+var writeMongoClient atomic.Pointer[mongo.Client]
+var readMongoClient atomic.Pointer[mongo.Client]
 var maxPoolSize, minPoolSize = uint64(100), uint64(0)
 var readClientOptions, writeClientOptions *options.ClientOptions = nil, nil
 var mongoReadDBAddr, mongoReadDBPort, mongoWriteDBAddr, mongoWriteDBPort string
@@ -35,8 +36,8 @@ func MongoDBConnectClientInit(serName, processId string) {
 			writeClientOptions = options.Client().ApplyURI("mongodb://" + userAndPassWord + mongoWriteDBAddr + ":" + mongoWriteDBPort)
 
 			//创建读写池（读写分离）
-			readMongoClient = CreateReadWriteMongoClient(readClientOptions)
-			writeMongoClient = CreateReadWriteMongoClient(writeClientOptions)
+			readMongoClient.Store(CreateReadWriteMongoClient(readClientOptions))
+			writeMongoClient.Store(CreateReadWriteMongoClient(writeClientOptions))
 		} else {
 			panic("MongoDB Init Error: netDB Connect Fail: " + res.Error())
 		}
@@ -65,11 +66,11 @@ func CreateReadWriteMongoClient(opc *options.ClientOptions) *mongo.Client {
 }
 
 func GetReadMongoClient() *mongo.Client {
-	return readMongoClient
+	return readMongoClient.Load()
 }
 
 func GetWriteMongoClient() *mongo.Client {
-	return writeMongoClient
+	return writeMongoClient.Load()
 }
 
 // StartMongoHealthCheck 后台定期 ping，连接断开时自动重建客户端，不影响业务调用路径
@@ -78,19 +79,19 @@ func StartMongoHealthCheck(interval time.Duration) {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for range ticker.C {
-			if readMongoClient != nil && readClientOptions != nil {
+			if readMongoClient.Load() != nil && readClientOptions != nil {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-				if err := readMongoClient.Ping(ctx, readpref.Primary()); err != nil {
+				if err := readMongoClient.Load().Ping(ctx, readpref.Primary()); err != nil {
 					printer.TextWarn("MongoHealthCheck", "ReadClient ping fail, reconnecting", err.Error())
-					readMongoClient = CreateReadWriteMongoClient(readClientOptions)
+					readMongoClient.Store(CreateReadWriteMongoClient(readClientOptions))
 				}
 				cancel()
 			}
-			if writeMongoClient != nil && writeClientOptions != nil {
+			if writeMongoClient.Load() != nil && writeClientOptions != nil {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-				if err := writeMongoClient.Ping(ctx, readpref.Primary()); err != nil {
+				if err := writeMongoClient.Load().Ping(ctx, readpref.Primary()); err != nil {
 					printer.TextWarn("MongoHealthCheck", "WriteClient ping fail, reconnecting", err.Error())
-					writeMongoClient = CreateReadWriteMongoClient(writeClientOptions)
+					writeMongoClient.Store(CreateReadWriteMongoClient(writeClientOptions))
 				}
 				cancel()
 			}
