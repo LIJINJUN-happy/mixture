@@ -208,11 +208,9 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 	}(s, sCoon)
 
 	//开启两个协程分别处理该连接对象的发送和接收逻辑
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go s.Transmit(sCoon, &wg)
-	go s.Dispose(sCoon, &wg)
-	wg.Wait()
+	go s.Transmit(sCoon)
+	go s.Dispose(sCoon)
+	time.Sleep(3 * time.Second) //等待Transmit和Dispose协程启动完成，避免还未设置网关ID就开始读取数据导致连接被关闭
 
 	//读取网关发送过来的数据
 	readObj := new(gateway_server.ReadStreamBufferObject)
@@ -249,7 +247,7 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 	}
 }
 
-func (s *ServerInfo) Transmit(sCoon *SerConnObj, wg *sync.WaitGroup) {
+func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 	defer func(s *SerConnObj) {
 		if r := recover(); r != nil {
 			printer.PanicStack(r)
@@ -264,7 +262,6 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj, wg *sync.WaitGroup) {
 
 	//收取通信道传输过来切割好的数据包内容
 	dataSlice := make([]byte, gateway_server.ReadStreamBufferSize)
-	wg.Done()
 	for {
 		select {
 		case transmitData := <-sCoon.sendChannel:
@@ -288,7 +285,7 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj, wg *sync.WaitGroup) {
 	}
 }
 
-func (s *ServerInfo) Dispose(sCoon *SerConnObj, wg *sync.WaitGroup) {
+func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
 	defer func(s *SerConnObj) {
 		if r := recover(); r != nil {
 			printer.PanicStack(r)
@@ -303,7 +300,6 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, wg *sync.WaitGroup) {
 	//收取通信道传输过来切割好的数据包内容
 	dataIdxFrom := gateway_server.ProtoNumLen + gateway_server.SessionIdLen
 	fun := s.GetDisposeFunc()
-	wg.Done()
 	for {
 		select {
 		case receiveData := <-sCoon.receiveChannel:
