@@ -419,7 +419,12 @@ func DeliveryMsg(gateID int, sessionId uint32, protoName string, data []byte) {
 		binary.BigEndian.PutUint32(sendDataBuf[:gateway_server.SessionIdLen], sessionId)
 		binary.BigEndian.PutUint16(sendDataBuf[gateway_server.SessionIdLen:gateway_server.SessionIdLen+gateway_server.ProtoNumLen], protoNum)
 		if n := copy(sendDataBuf[gateway_server.SessionIdLen+gateway_server.ProtoNumLen:], data); n == dataLen {
-			gateConn.GetSendChannel() <- sendDataBuf
+			//非阻塞写，避免 gateway 慢时阻塞模块协程
+			select {
+			case gateConn.GetSendChannel() <- sendDataBuf:
+			default:
+				printer.TextWarn("DeliveryMsg SendChannel Full, Drop msg", "GateID", gateID, "protoName", protoName, "sessionId", sessionId)
+			}
 		} else {
 			printer.TextError("copy sendDataBuf Not Same, copy result size = "+strconv.Itoa(n)+" dataLen =", strconv.Itoa(dataLen))
 			sendDataBuf = nil
