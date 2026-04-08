@@ -74,6 +74,9 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 		}
 		//printer.TextInfo("doDistribute", "protoName: ", protoName, "protoSendSerName: ", protoSendSerName)
 
+		// 缩切到实际数据长度，接收端 *bufPtr 即为有效数据
+		*bufPtr = data
+
 		//注意此时的data依旧是包含协议号的数据
 		switch protoSendSerName {
 		case "actor_server":

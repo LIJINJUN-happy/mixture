@@ -426,6 +426,7 @@ func DeliveryMsg(gateID int, sessionId uint32, protoName string, data []byte) {
 		binary.BigEndian.PutUint32(sendDataBuf[:gateway_server.SessionIdLen], sessionId)
 		binary.BigEndian.PutUint16(sendDataBuf[gateway_server.SessionIdLen:gateway_server.SessionIdLen+gateway_server.ProtoNumLen], protoNum)
 		if n := copy(sendDataBuf[gateway_server.SessionIdLen+gateway_server.ProtoNumLen:], data); n == dataLen {
+			*bufPtr = sendDataBuf // 缩切到实际数据长度，接收端 *bufPtr 即为有效数据
 			//非阻塞写，避免 gateway 慢时阻塞模块协程
 			select {
 			case gateConn.GetSendChannel() <- bufPtr:
