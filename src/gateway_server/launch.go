@@ -1,7 +1,6 @@
 package gateway_server
 
 import (
-	"container/list"
 	"database/sql"
 	"encoding/binary"
 	"encoding/json"
@@ -173,11 +172,11 @@ func BeginLinkServer(sl *SerLinker) {
 		}
 		serData := make([]byte, ConnReadBufSize)
 		sliceBuffer := make([]byte, ReadStreamBufferSize)
-		cutList := list.New()
+		var cutList CutIndexList
 
 		//解析xxx服务进程发送来的数据(派发到对应进程的通信道中)
 		for {
-			cutList = cutList.Init()
+			cutList.Reset()
 			readNum, readErr := dial.Read(serData)
 			if readErr != nil {
 				printer.TextError("Read Data Fail ", "serLinker.linkerName", serLinker.linkerName, "readErr", readErr.Error())
@@ -194,10 +193,10 @@ func BeginLinkServer(sl *SerLinker) {
 				return
 			} else {
 				//printer.TextInfo("Get Data ", "From ", serLinker.linkerName, "serData", serData[:readNum])
-				DoSplit(rsbObject, serData, readNum, cutList, sliceBuffer)
+				DoSplit(rsbObject, serData, readNum, &cutList, sliceBuffer)
 
 				//派发到对应的通信道中(来自其他服务所以sourceSessionID为0，标识不是来自客户端发送来的协议数据)
-				DoDistribute(cutList, sliceBuffer, 0)
+				DoDistribute(&cutList, sliceBuffer, 0)
 			}
 		}
 

@@ -18,11 +18,12 @@ const ConnReadBufSize = 4096               //每次读取客户端传来的数�
 const ConnWriteChanCaps = 64               //写信道缓存容量
 const ReadStreamBufferSize = 5120          //字节流读取对象的已读书缓存长度(1024 * 5 )
 const MaxPacketBodySize = uint16(4096)     //单个数据包体最大允许长度，超出视为非法包
+const MaxPacketsPerRead = 256              //一次 Read 最多切出的包数上限，超出丢弃并报警
 const ReadStreamBufferObjectWay uint8 = 1  //字节流切割方式
 const MaxConnectClientNum = 10000          //最大客户端同时连接数量
 const messageType int = 1                  //webSocket的消息类型（默认为1文本类型）
 const maxGateRebuildListenTimes int32 = 10 //网关监听最大重启次数
-const splitSign = 124                      //字节流切割的标识符（‘|’）
+const splitSign = 124                      //字节流切割的标识符（’|’）
 const HeadLen int = 2                      //数据包头部长度（多少字节）,大端
 const ProtoNumLen int = 2                  //数据包中的协议占的字节长度,大端
 const SessionIdLen int = 4                 //数据包来自哪个用户标识的字节长度（来自客户端或者是发送给客户端的时候必须有这个字段内容值,否者找不到发送目标）
@@ -31,6 +32,34 @@ const channelBufferSize = 1024             //channelArray中每个chan的缓存�
 const ConnReadTimeout = 900 * time.Second  //读取用户超时间隔（为了防止长时间无响应的情况）
 const IntervalLoopingTime = 30 * time.Second
 const GoroutineSyncBreakSign = "_CLOSE"
+
+// CutIndexList 替代 container/list，存放每次 DoSplit 切出的包尾下标
+// 声明在调用方栈上，零堆分配，零 GC 压力
+type CutIndexList struct {
+	data [MaxPacketsPerRead]int
+	len  int
+}
+
+func (c *CutIndexList) Reset() {
+	c.len = 0
+}
+
+func (c *CutIndexList) Push(v int) {
+	if c.len < MaxPacketsPerRead {
+		c.data[c.len] = v
+		c.len++
+	} else {
+		printer.TextWarn("CutIndexList", "MaxPacketsPerRead exceeded, packet dropped")
+	}
+}
+
+func (c *CutIndexList) Get(i int) int {
+	return c.data[i]
+}
+
+func (c *CutIndexList) Len() int {
+	return c.len
+}
 
 // 白名单指针对象
 var WhiteListPtr = new(WhiteList)

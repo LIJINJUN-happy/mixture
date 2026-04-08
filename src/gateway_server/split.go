@@ -2,13 +2,12 @@ package gateway_server
 
 import (
 	"bytes"
-	"container/list"
 	"encoding/binary"
 	"mixture/src/common/printer"
 )
 
 // 处理服务进程连接对象发送过来的协议，返回 false 表示收到非法包，调用方应断开连接
-func DealBufferData(newConn *NewConnection, readNum int, l *list.List, sliceBuffer []byte) bool {
+func DealBufferData(newConn *NewConnection, readNum int, l *CutIndexList, sliceBuffer []byte) bool {
 	if !DoSplit(newConn.StreamBuffer, newConn.ReadBuf, readNum, l, sliceBuffer) {
 		return false
 	}
@@ -17,7 +16,7 @@ func DealBufferData(newConn *NewConnection, readNum int, l *list.List, sliceBuff
 }
 
 // DoSplit /* 三种读取字节流切割方式： 1.根据字节长度来读取数据   2.根据标记来切割字节流  3定长读取，每个包都是固定长度*/
-func DoSplit(j *ReadStreamBufferObject, byteSlice []byte, readNum int, list *list.List, sliceBuffer []byte) bool {
+func DoSplit(j *ReadStreamBufferObject, byteSlice []byte, readNum int, list *CutIndexList, sliceBuffer []byte) bool {
 	switch j.readWay {
 	case 1:
 		return DoSplitByReadHeadLen(j, byteSlice, readNum, list, sliceBuffer, 0)
@@ -32,7 +31,7 @@ func DoSplit(j *ReadStreamBufferObject, byteSlice []byte, readNum int, list *lis
 
 // 1.根据字节长度来读取数据(注意切割的时候有可能是包头被切割了,需要判断下包头字节问题,除非包头是1字节)
 // 返回 false 表示包头声明的长度超过允许上限，调用方应断开连接
-func DoSplitByReadHeadLen(j *ReadStreamBufferObject, byteSlice []byte, readNum int, list *list.List, sliceBuffer []byte, beginIdx int) bool {
+func DoSplitByReadHeadLen(j *ReadStreamBufferObject, byteSlice []byte, readNum int, list *CutIndexList, sliceBuffer []byte, beginIdx int) bool {
 	if j.totalNeedReadLen == 0 {
 		if len(byteSlice) >= HeadLen {
 			//需要判断包头是否被切割了（不仅仅只考虑包体拼接）
@@ -69,7 +68,7 @@ func DoSplitByReadHeadLen(j *ReadStreamBufferObject, byteSlice []byte, readNum i
 		retNum := copy(sliceBuffer[beginIdx:], j.byteData[0:])
 		beginIdx += retNum
 		if retNum >= 1 {
-			list.PushBack(beginIdx)
+			list.Push(beginIdx)
 		}
 
 		//重置readStreamBufferObject结构对象成员值
@@ -86,7 +85,7 @@ func DoSplitByReadHeadLen(j *ReadStreamBufferObject, byteSlice []byte, readNum i
 }
 
 // 2.根据标记来切割字节流(这里用splitSign常量表示,该方法缺点是前端发送的数据中带有该切割符就会让该方法切割错误)
-func DoSplitBySign(j *ReadStreamBufferObject, byteSlice []byte, readNum int, list *list.List, sliceBuffer []byte, beginIdx int) {
+func DoSplitBySign(j *ReadStreamBufferObject, byteSlice []byte, readNum int, list *CutIndexList, sliceBuffer []byte, beginIdx int) {
 	byteSlice = byteSlice[:readNum] //实际数据
 	//printer.TextDebug("doSplitBySign", "要处理的数据大小", readNum)
 	//printer.TextDebug("doSplitBySign", "要处理的数据", string(byteSlice))
@@ -105,7 +104,7 @@ func DoSplitBySign(j *ReadStreamBufferObject, byteSlice []byte, readNum int, lis
 				retNum := copy(sliceBuffer[beginIdx:], j.byteData[0:])
 				beginIdx += retNum
 				if retNum >= 1 {
-					list.PushBack(beginIdx)
+					list.Push(beginIdx)
 				}
 			}
 			j.byteData = j.byteData[0:0]
@@ -126,7 +125,7 @@ func DoSplitBySign(j *ReadStreamBufferObject, byteSlice []byte, readNum int, lis
 }
 
 // 3.根据定长取字节流数据(缺点是假如数据量少就会浪费流量资源,空白部分用'\0'补充)
-func DoSplitByAppointLen(j *ReadStreamBufferObject, byteSlice []byte, readNum int, list *list.List, sliceBuffer []byte, beginIdx int) {
+func DoSplitByAppointLen(j *ReadStreamBufferObject, byteSlice []byte, readNum int, list *CutIndexList, sliceBuffer []byte, beginIdx int) {
 	byteSlice = byteSlice[:readNum]
 	diffLen := int(appointLen - j.curReadLen) //剩余形成完整数据包要读的数据大小
 	if diffLen <= readNum {
@@ -137,7 +136,7 @@ func DoSplitByAppointLen(j *ReadStreamBufferObject, byteSlice []byte, readNum in
 		retNum := copy(sliceBuffer[beginIdx:], j.byteData[0:])
 		beginIdx += retNum
 		if retNum >= 1 {
-			list.PushBack(beginIdx)
+			list.Push(beginIdx)
 		}
 		j.byteData = j.byteData[0:0]
 		j.curReadLen = 0

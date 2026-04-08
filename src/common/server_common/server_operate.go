@@ -1,7 +1,6 @@
 package server_common
 
 import (
-	"container/list"
 	"database/sql"
 	"encoding/binary"
 	"encoding/json"
@@ -216,7 +215,7 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 	readObj := new(gateway_server.ReadStreamBufferObject)
 	readObj.Init(1) //进程间默认用模式1分割字节数据
 	readBuff, sliceBuffer := make([]byte, gateway_server.ConnReadBufSize), make([]byte, gateway_server.ReadStreamBufferSize)
-	cutList := list.New()
+	var cutList gateway_server.CutIndexList
 	idx := 0
 	for {
 		idx = 0
@@ -232,10 +231,10 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 		//printer.TextInfo("sCoon.gateSerConn Read", "ReadResNum", num)
 
 		//把读取到的数据发送到处理逻辑通信道中,待注册函数做逻辑处理
-		cutList = cutList.Init()
-		gateway_server.DoSplit(readObj, readBuff[0:], num, cutList, sliceBuffer)
-		for it := cutList.Front(); it != nil; it = it.Next() {
-			elementIDX := it.Value.(int)
+		cutList.Reset()
+		gateway_server.DoSplit(readObj, readBuff[0:], num, &cutList, sliceBuffer)
+		for i := 0; i < cutList.Len(); i++ {
+			elementIDX := cutList.Get(i)
 			newByte := make([]byte, elementIDX-idx)
 			copyRes := copy(newByte, sliceBuffer[idx:elementIDX])
 			//printer.TextInfo("gateway_server DoSplit ", "CopyResNum", copyRes)

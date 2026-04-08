@@ -1,7 +1,6 @@
 package gateway_server
 
 import (
-	"container/list"
 	"mixture/src/common/printer"
 	"net/http"
 	"strconv"
@@ -64,7 +63,7 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 
 	//Do Read
 	sliceBuffer := make([]byte, ReadStreamBufferSize)
-	cutList := list.New()
+	var cutList CutIndexList
 	for {
 		//设置读取的超时时间
 		dLineTime := time.Now().Add(ConnReadTimeout)
@@ -73,7 +72,7 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 			printer.TextError("WebSocket SetReadDeadline", "Error", err.Error())
 		}
 
-		cutList = cutList.Init()
+		cutList.Reset()
 		num, _, readError := (*newConn).Read()
 		if readError != nil {
 			if checkRes, descString := CheckIsCloseByRemote(readError); checkRes {
@@ -87,7 +86,7 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 		} else {
 			//处理接收到的数据
 			//printer.TextInfo("doUpgradeWS", "num", num, "message", string(newConn.ReadBuf[:num]))
-			if !DealBufferData(newConn, num, cutList, sliceBuffer) {
+			if !DealBufferData(newConn, num, &cutList, sliceBuffer) {
 				printer.TextWarn("DoUpgradeWS", "Illegal packet, closing connection", (*newConn).RemoteAddr().String())
 				return
 			}

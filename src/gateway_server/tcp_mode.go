@@ -1,7 +1,6 @@
 package gateway_server
 
 import (
-	"container/list"
 	"mixture/src/common/printer"
 	"net"
 	"runtime/debug"
@@ -114,7 +113,7 @@ func DoReadMsg(newConn *NewConnection) {
 	}()
 
 	sliceBuffer := make([]byte, ReadStreamBufferSize)
-	cutList := list.New()
+	var cutList CutIndexList
 	for {
 		//设置下次读取的超时时间
 		dLineTime := time.Now().Add(ConnReadTimeout)
@@ -123,7 +122,7 @@ func DoReadMsg(newConn *NewConnection) {
 			printer.TextError("Socket SetReadDeadline", "Error", err.Error())
 		}
 
-		cutList = cutList.Init()
+		cutList.Reset()
 		num, _, readError := (*newConn).Read()
 		if readError != nil {
 			if checkRes, descString := CheckIsCloseByRemote(readError); checkRes {
@@ -137,7 +136,7 @@ func DoReadMsg(newConn *NewConnection) {
 		} else {
 			//处理接收到的数据
 			printer.TextDebug("doReadMsg", "num", num, "message", string(newConn.ReadBuf[:num]))
-			if !DealBufferData(newConn, num, cutList, sliceBuffer) {
+			if !DealBufferData(newConn, num, &cutList, sliceBuffer) {
 				printer.TextWarn("DoReadMsg", "Illegal packet, closing connection", (*newConn).RemoteAddr().String())
 				return
 			}

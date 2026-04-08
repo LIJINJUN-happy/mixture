@@ -1,7 +1,6 @@
 package gateway_server
 
 import (
-	"container/list"
 	"encoding/binary"
 	"encoding/json"
 	"mixture/src/common/printer"
@@ -31,14 +30,14 @@ func SafeSendToLinker(linker *SerLinker, data []byte, bufPtr *[]byte) {
 
 // 协议格式：[[sessionID(4字节)][proNum(2字节)][data(xxx字节)]]
 // 该函数负责数据的判断与转发(sourceSession 用于区别是来自服务器内部还是客户端,假如来自客户端需要添加上相关的字段内容再做转发)
-func DoDistribute(cutList *list.List, sliceBuffer []byte, sourceSession uint32) {
+func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint32) {
 	beginIdx := 0
 	extraLen := 0
 	if sourceSession > 0 {
 		extraLen += SessionIdLen //假如来自客户端传输过来的数据,需要额外添加sessionID 值（4字节）的长度
 	}
-	for iterator := cutList.Front(); iterator != nil; iterator = iterator.Next() {
-		element := iterator.Value.(int)
+	for i := 0; i < cutList.Len(); i++ {
+		element := cutList.Get(i)
 		//printer.TextDebug("doDistribute", "beginIdx", beginIdx, "element", element, "data", sliceBuffer[beginIdx:element])
 
 		//池化获取内存
@@ -294,8 +293,7 @@ func SendMsg2Server(sessionId uint32, protoName string, data []byte) {
 	printer.TextInfo("SendMsg2Server", "protoName", protoName, "data", data, "pnum", p, "newData", newData)
 
 	//调用派发协议接口送出协议
-	cutList := list.New()
-	cutList = cutList.Init()
-	cutList.PushBack(len(data) + HeadLen)
-	DoDistribute(cutList, newData[0:], sessionId)
+	var cutList CutIndexList
+	cutList.Push(len(data) + HeadLen)
+	DoDistribute(&cutList, newData[0:], sessionId)
 }
