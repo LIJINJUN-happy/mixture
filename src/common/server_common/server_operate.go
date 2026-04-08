@@ -37,6 +37,14 @@ type ServerInfo struct {
 	ServerHandleFuncMap map[string]func(data []byte) error //服务处理函数集
 }
 
+// DeliveryMsg 发送缓冲池，容量对齐进程间最大包体（SessionId+ProtoNum+数据），上限取 ReadStreamBufferSize，足够容纳所有协议包
+var DeliveryMsgBufPool = sync.Pool{
+	New: func() interface{} {
+		buf := make([]byte, gateway_server.ReadStreamBufferSize)
+		return &buf
+	},
+}
+
 func (s *ServerInfo) InitInfo(serName string, id int) bool {
 	db, isOk := database.GetSQLiteConnDB()
 	if isOk != nil {
@@ -268,6 +276,10 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 				if trueData, conversionResult := transmitData.([]byte); conversionResult {
 					if num := gateway_server.DoPack(dataSlice, trueData, 1); num > 0 {
 						_, writeErr := (*sCoon.gateSerConn).Write(dataSlice[0:num])
+						if cap(trueData) == gateway_server.ReadStreamBufferSize {
+							buf := trueData[:gateway_server.ReadStreamBufferSize]
+							DeliveryMsgBufPool.Put(&buf) // 归还由 DeliveryMsgBufPool 分配的标准大小缓冲区
+						}
 						if writeErr != nil {
 							printer.TextError("DialObject Write Fail", "writeErr", writeErr.Error(), "ServerName", s.ServerName, "ServerId", s.ServerId)
 							return
@@ -410,7 +422,8 @@ func DeliveryMsg(gateID int, sessionId uint32, protoName string, data []byte) {
 	}
 	if gateConn, dataLen := ServicePrt.GetConnObj(gateID), len(data); gateConn != nil {
 		msgTotalSize := gateway_server.SessionIdLen + gateway_server.ProtoNumLen + dataLen //数据包结构=[session][协议号][数据内容]
-		sendDataBuf := make([]byte, msgTotalSize)
+		bufPtr := DeliveryMsgBufPool.Get().(*[]byte)
+		sendDataBuf := (*bufPtr)[:msgTotalSize]
 		binary.BigEndian.PutUint32(sendDataBuf[:gateway_server.SessionIdLen], sessionId)
 		binary.BigEndian.PutUint16(sendDataBuf[gateway_server.SessionIdLen:gateway_server.SessionIdLen+gateway_server.ProtoNumLen], protoNum)
 		if n := copy(sendDataBuf[gateway_server.SessionIdLen+gateway_server.ProtoNumLen:], data); n == dataLen {
@@ -419,10 +432,11 @@ func DeliveryMsg(gateID int, sessionId uint32, protoName string, data []byte) {
 			case gateConn.GetSendChannel() <- sendDataBuf:
 			default:
 				printer.TextWarn("DeliveryMsg SendChannel Full, Drop msg", "GateID", gateID, "protoName", protoName, "sessionId", sessionId)
+				DeliveryMsgBufPool.Put(bufPtr)
 			}
 		} else {
 			printer.TextError("copy sendDataBuf Not Same, copy result size = "+strconv.Itoa(n)+" dataLen =", strconv.Itoa(dataLen))
-			sendDataBuf = nil
+			DeliveryMsgBufPool.Put(bufPtr)
 		}
 	} else {
 		printer.TextError("GetConnObj Fail", "GateID", gateID)

@@ -40,27 +40,6 @@ type CutIndexList struct {
 	len  int
 }
 
-func (c *CutIndexList) Reset() {
-	c.len = 0
-}
-
-func (c *CutIndexList) Push(v int) {
-	if c.len < MaxPacketsPerRead {
-		c.data[c.len] = v
-		c.len++
-	} else {
-		printer.TextWarn("CutIndexList", "MaxPacketsPerRead exceeded, packet dropped")
-	}
-}
-
-func (c *CutIndexList) Get(i int) int {
-	return c.data[i]
-}
-
-func (c *CutIndexList) Len() int {
-	return c.len
-}
-
 // 白名单指针对象
 var WhiteListPtr = new(WhiteList)
 
@@ -303,4 +282,25 @@ func (w *WhiteList) ChangeActiveStatus(cmd bool) {
 	w.WhiteMux.Lock()
 	defer w.WhiteMux.Unlock()
 	w.IsActive = cmd
+}
+
+func (c *CutIndexList) Reset() {
+	c.len = 0
+}
+
+func (c *CutIndexList) Push(v int) {
+	if c.len < MaxPacketsPerRead {
+		c.data[c.len] = v
+		c.len++
+	} else {
+		printer.TextWarn("CutIndexList", "MaxPacketsPerRead exceeded, packet dropped")
+	}
+}
+
+func (c *CutIndexList) Get(i int) int {
+	return c.data[i]
+}
+
+func (c *CutIndexList) Len() int {
+	return c.len
 }
