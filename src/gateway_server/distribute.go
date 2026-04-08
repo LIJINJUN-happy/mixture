@@ -20,12 +20,12 @@ var DistributeDataPool = sync.Pool{
 	},
 }
 
-func SafeSendToLinker(linker *SerLinker, bufPtr *[]byte) {
+func SafeSendToLinker(linker *SerLinker, data []byte, bufPtr *[]byte) {
 	select {
-	case linker.receiveChannel <- *bufPtr:
+	case linker.receiveChannel <- data:
 	default:
 		printer.TextWarn("DoDistribute", "Linker channel full, drop packet", linker.linkerName)
-		DistributeDataPool.Put(bufPtr) // 池化内存必须归还
+		DistributeDataPool.Put(bufPtr)
 	}
 }
 
@@ -78,13 +78,13 @@ func DoDistribute(cutList *list.List, sliceBuffer []byte, sourceSession uint32) 
 		//注意此时的data依旧是包含协议号的数据
 		switch protoSendSerName {
 		case "actor_server":
-			SafeSendToLinker(ActorSerLinker, bufPtr)
+			SafeSendToLinker(ActorSerLinker, data, bufPtr)
 		case "modularized_server":
-			SafeSendToLinker(ModularizedSerLinker, bufPtr)
+			SafeSendToLinker(ModularizedSerLinker, data, bufPtr)
 		case "interactive_server":
-			SafeSendToLinker(InteractiveSerLinker, bufPtr)
+			SafeSendToLinker(InteractiveSerLinker, data, bufPtr)
 		case "web_server":
-			SafeSendToLinker(WebSerLinker, bufPtr)
+			SafeSendToLinker(WebSerLinker, data, bufPtr)
 		case "gateway_server":
 			sendTarSessionID := binary.BigEndian.Uint32(data[:SessionIdLen]) //根据sendTarSessionID转发到对应客户端Write协程读取的chan中
 			if client, resSearchFromMap := GateClientMap.Load(sendTarSessionID); resSearchFromMap {
