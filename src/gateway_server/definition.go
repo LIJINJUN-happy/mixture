@@ -84,7 +84,7 @@ type NewConnection struct {
 	conn         *net.Conn       //socket对象(tcp模式)
 	wsConn       *websocket.Conn //socket对象(ws模式)
 	ReadBuf      []byte          //socket读取的数据存放切片
-	writeChan    chan []byte     //socket获取数据的通信道（来自其他进程进程的数据）
+	writeChan    chan *[]byte    //socket获取数据的通信道（来自其他进程进程的数据）
 	rwChannel    chan string     //用于conn对象的Read和Write协程间的通知,实现同步关闭,不同步关闭的话会造成内存泄露
 	ipString     string          //网络地址
 	StreamBuffer *ReadStreamBufferObject
@@ -94,8 +94,8 @@ type NewConnection struct {
 type SerLinker struct {
 	linkerName     string
 	address        string
-	receiveChannel chan any  //用来接收所有将要派发到对应进程的数据（相当于连接器发送缓存通道）
-	serConn        *net.Conn //链接xx服务进程的socket对象
+	receiveChannel chan *[]byte //用来接收所有将要派发到对应进程的数据（相当于连接器发送缓存通道）nil 表示关闭信号
+	serConn        *net.Conn   //链接xx服务进程的socket对象
 }
 
 // GateInformation for GateWaySer Object 网关服务相关参数
@@ -117,7 +117,7 @@ type clientSession struct {
 	ip                net.IP      //客户端的IP地址
 	port              uint16      //端口值
 	wholeAddress      string      //端口+地址
-	clientBuffChannel chan []byte //客户端的接收协议的通信道
+	clientBuffChannel chan *[]byte //客户端的接收协议的通信道
 }
 
 // ReadStreamBufferObject读取字节流的数据存放处,每个包都是头部2字节，2字节保存的值是数据的长度
@@ -149,7 +149,7 @@ func (netObj *NewConnection) Init(way uint8, socketConn *net.Conn, wSocketConn *
 	netObj.connType = typeofConn
 	netObj.connTime = time.Now()
 	netObj.ReadBuf = make([]byte, ConnReadBufSize)
-	netObj.writeChan = make(chan []byte, ConnWriteChanCaps)
+	netObj.writeChan = make(chan *[]byte, ConnWriteChanCaps)
 	netObj.rwChannel = make(chan string, 2)
 
 	//设置ipString作为Goroutine的标识映射
@@ -161,7 +161,7 @@ func (netObj *NewConnection) Init(way uint8, socketConn *net.Conn, wSocketConn *
 }
 
 // 往map中添加newConnection对应的writeChan
-func (netObj *NewConnection) AddIntoGateMap(writeChan chan []byte) {
+func (netObj *NewConnection) AddIntoGateMap(writeChan chan *[]byte) {
 	clientAddress := (*netObj).RemoteAddr().String()
 	//printer.TextDebug("clientAddress = " + clientAddress)
 	//不用担心超过uint32后溢出的情况，Add方法在溢出时会自动回绕（wrap around），这是无符号整数在底层硬件上的标准行为
@@ -239,7 +239,7 @@ func (linker *SerLinker) InitLinker(linkerName string, db *sql.DB, linkerID int)
 		panic("Error initLinker " + linkerName + ": " + strconv.Itoa(linkerID))
 	}
 
-	linker.receiveChannel = make(chan any, channelBufferSize)
+	linker.receiveChannel = make(chan *[]byte, channelBufferSize)
 	linker.serConn = nil
 	linker.linkerName = linkerName
 

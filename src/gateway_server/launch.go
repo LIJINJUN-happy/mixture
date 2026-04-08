@@ -132,7 +132,7 @@ func BeginLinkServer(sl *SerLinker) {
 	go func(serLinker *SerLinker) {
 		defer func(s *SerLinker) {
 			//通知停止处理(*dialObject).Write操作,因为panic重启该协程,会造成旧的write协程没被销毁从而协程泄露
-			s.receiveChannel <- GoroutineSyncBreakSign
+			s.receiveChannel <- nil
 
 			closeErr := (*s.serConn).Close() //关闭旧socket,链接成功会重新赋值一个新的socket
 			if closeErr != nil {
@@ -226,31 +226,21 @@ func DealWithLinkerData(linker *SerLinker) {
 	dataSlice := make([]byte, ReadStreamBufferSize)
 	for {
 		select {
-		case anyData := <-linker.receiveChannel:
-			switch analysis := anyData.(type) {
-			case string:
-				if analysis == GoroutineSyncBreakSign {
-					return
-				}
-			case []byte:
-				num := DoPack(dataSlice, analysis, ReadStreamBufferObjectWay) //默认内部转发用方式1,包头+包体
-				if num <= 0 {
-					break
-				}
+		case bufPtr := <-linker.receiveChannel:
+			if bufPtr == nil {
+				return // 关闭信号
+			}
+			num := DoPack(dataSlice, *bufPtr, ReadStreamBufferObjectWay) //默认内部转发用方式1,包头+包体
+			if num > 0 {
 				if _, writeErr := (*linker.serConn).Write(dataSlice[0:num]); writeErr != nil {
 					printer.TextError("GateWay DialObject Write Fail", "writeErr", writeErr)
 				} else {
 					printer.TextDebug("GateWay DialObject Write Success", "writeNum", num, "dataSlice", string(dataSlice[0:num]))
 				}
-
-				// 发送完毕后，将切片恢复到原始容量并放回对象池(DoDistribute 在分配协议内容时使用了池化获取内存对象,所以这里需要放回池中以供下次使用)
-				if cap(analysis) == ReadStreamBufferSize {
-					analysis = analysis[:ReadStreamBufferSize]
-					DistributeDataPool.Put(&analysis)
-				}
-			default:
-				printer.TextDebug("DealWithLinkerData", "unknown type", analysis)
 			}
+			// 恢复容量后归还池，原始指针直接 Put，零逃逸
+			*bufPtr = (*bufPtr)[:cap(*bufPtr)]
+			DistributeDataPool.Put(bufPtr)
 		}
 	}
 }

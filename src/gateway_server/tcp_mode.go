@@ -76,23 +76,22 @@ func DoWriteMsg(newConn *NewConnection) {
 				printer.TextDebug("收到" + SynFromReadGoroutine)
 				return
 			}
-		case gameReturnData := <-newConn.writeChan:
-			num := DoPack(sendBuffer, gameReturnData[SessionIdLen:], newConn.StreamBuffer.readWay) //发送给客户端前需要把SessionID前缀去掉
+		case bufPtr := <-newConn.writeChan:
+			num := DoPack(sendBuffer, (*bufPtr)[SessionIdLen:], newConn.StreamBuffer.readWay) //发送给客户端前需要把SessionID前缀去掉
 			if num > 0 {
 				sendByteNum, writeError := (*newConn).Write(sendBuffer[:num])
 				if writeError != nil {
 					printer.TextError("Write Error", "err", writeError.Error())
+					*bufPtr = (*bufPtr)[:cap(*bufPtr)]
+					DistributeDataPool.Put(bufPtr)
 					return
 				} else {
 					printer.TextDebug("Write Success", "Send Byte Size", strconv.Itoa(sendByteNum))
 				}
 			}
-
-			// 发送完毕后，将切片恢复到原始容量并放回对象池
-			if cap(gameReturnData) == ReadStreamBufferSize {
-				gameReturnData = gameReturnData[:ReadStreamBufferSize]
-				DistributeDataPool.Put(&gameReturnData)
-			}
+			// 恢复容量后归还池，原始指针直接 Put，零逃逸
+			*bufPtr = (*bufPtr)[:cap(*bufPtr)]
+			DistributeDataPool.Put(bufPtr)
 		}
 	}
 }

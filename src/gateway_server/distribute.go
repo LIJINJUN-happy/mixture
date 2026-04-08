@@ -19,9 +19,9 @@ var DistributeDataPool = sync.Pool{
 	},
 }
 
-func SafeSendToLinker(linker *SerLinker, data []byte, bufPtr *[]byte) {
+func SafeSendToLinker(linker *SerLinker, bufPtr *[]byte) {
 	select {
-	case linker.receiveChannel <- data:
+	case linker.receiveChannel <- bufPtr:
 	default:
 		printer.TextWarn("DoDistribute", "Linker channel full, drop packet", linker.linkerName)
 		DistributeDataPool.Put(bufPtr)
@@ -77,22 +77,25 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 		//注意此时的data依旧是包含协议号的数据
 		switch protoSendSerName {
 		case "actor_server":
-			SafeSendToLinker(ActorSerLinker, data, bufPtr)
+			SafeSendToLinker(ActorSerLinker, bufPtr)
 		case "modularized_server":
-			SafeSendToLinker(ModularizedSerLinker, data, bufPtr)
+			SafeSendToLinker(ModularizedSerLinker, bufPtr)
 		case "interactive_server":
-			SafeSendToLinker(InteractiveSerLinker, data, bufPtr)
+			SafeSendToLinker(InteractiveSerLinker, bufPtr)
 		case "web_server":
-			SafeSendToLinker(WebSerLinker, data, bufPtr)
+			SafeSendToLinker(WebSerLinker, bufPtr)
 		case "gateway_server":
 			sendTarSessionID := binary.BigEndian.Uint32(data[:SessionIdLen]) //根据sendTarSessionID转发到对应客户端Write协程读取的chan中
 			if client, resSearchFromMap := GateClientMap.Load(sendTarSessionID); resSearchFromMap {
 				if session, changeTypeRes := client.(*clientSession); changeTypeRes {
 					select {
-					case session.clientBuffChannel <- data:
+					case session.clientBuffChannel <- bufPtr:
 					default:
 						printer.TextWarn("DoDistribute", "Client Buffer Full, Drop Msg SessionID", sendTarSessionID) //缓冲区满了
+						DistributeDataPool.Put(bufPtr)
 					}
+				} else {
+					DistributeDataPool.Put(bufPtr)
 				}
 			} else if sendTarSessionID == 0 {
 				printer.TextWarn("DoDistribute Check serFunc", "protoName", protoName)
@@ -101,6 +104,8 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 				case "xxxxx":
 				default:
 				}
+				DistributeDataPool.Put(bufPtr)
+			} else {
 				DistributeDataPool.Put(bufPtr)
 			}
 		default:

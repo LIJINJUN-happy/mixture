@@ -271,23 +271,22 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 	dataSlice := make([]byte, gateway_server.ReadStreamBufferSize)
 	for {
 		select {
-		case transmitData := <-sCoon.sendChannel:
+		case bufPtr := <-sCoon.sendChannel:
 			if sCoon.gateSerConn != nil {
-				if trueData, conversionResult := transmitData.([]byte); conversionResult {
-					if num := gateway_server.DoPack(dataSlice, trueData, 1); num > 0 {
-						_, writeErr := (*sCoon.gateSerConn).Write(dataSlice[0:num])
-						if cap(trueData) == gateway_server.ReadStreamBufferSize {
-							buf := trueData[:gateway_server.ReadStreamBufferSize]
-							DeliveryMsgBufPool.Put(&buf) // 归还由 DeliveryMsgBufPool 分配的标准大小缓冲区
-						}
-						if writeErr != nil {
-							printer.TextError("DialObject Write Fail", "writeErr", writeErr.Error(), "ServerName", s.ServerName, "ServerId", s.ServerId)
-							return
-						}
-						//printer.TextDebug("DialObject Write Success ", "writeNum", writeNum, "dataSlice", string(dataSlice[0:writeNum]))
+				if num := gateway_server.DoPack(dataSlice, *bufPtr, 1); num > 0 {
+					_, writeErr := (*sCoon.gateSerConn).Write(dataSlice[0:num])
+					if writeErr != nil {
+						printer.TextError("DialObject Write Fail", "writeErr", writeErr.Error(), "ServerName", s.ServerName, "ServerId", s.ServerId)
+						*bufPtr = (*bufPtr)[:cap(*bufPtr)]
+						DeliveryMsgBufPool.Put(bufPtr)
+						return
 					}
+					//printer.TextDebug("DialObject Write Success ", "writeNum", writeNum, "dataSlice", string(dataSlice[0:writeNum]))
 				}
 			}
+			// 恢复容量后归还池，原始指针直接 Put，零逃逸，同时覆盖 DoPack<=0 分支
+			*bufPtr = (*bufPtr)[:cap(*bufPtr)]
+			DeliveryMsgBufPool.Put(bufPtr)
 		case <-loopTicker.C:
 			if sCoon.gateSerConn == nil {
 				return
@@ -429,7 +428,7 @@ func DeliveryMsg(gateID int, sessionId uint32, protoName string, data []byte) {
 		if n := copy(sendDataBuf[gateway_server.SessionIdLen+gateway_server.ProtoNumLen:], data); n == dataLen {
 			//非阻塞写，避免 gateway 慢时阻塞模块协程
 			select {
-			case gateConn.GetSendChannel() <- sendDataBuf:
+			case gateConn.GetSendChannel() <- bufPtr:
 			default:
 				printer.TextWarn("DeliveryMsg SendChannel Full, Drop msg", "GateID", gateID, "protoName", protoName, "sessionId", sessionId)
 				DeliveryMsgBufPool.Put(bufPtr)
