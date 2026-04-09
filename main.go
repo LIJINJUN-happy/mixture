@@ -44,6 +44,7 @@ func main() {
 	database.MongoDBConnectClientInit(serName, processId)
 	database.StartMongoHealthCheck(30 * time.Second)
 	database.MemCacheConnectClientInit(serName, processId)
+	database.StartMemCacheHealthCheck(30 * time.Second)
 
 	defer func() {
 		if err := recover(); err != nil {
