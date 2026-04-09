@@ -43,14 +43,10 @@ func CreateMenCacheElement() *memcache.Client {
 	}
 }
 
-func GetMemCacheClient() *memcache.Client {
-	return cache.Load()
-}
-
 // 缓存操作调用统一接口
 func MemCacheCmd(cmd, key string, val []byte) (bool, string) {
 	errString := "Get NUll MemCache Client" //错误描述
-	m := GetMemCacheClient()                //获取连接池对象
+	m := cache.Load()                       //获取连接池对象
 
 	if m != nil {
 		//操作：
