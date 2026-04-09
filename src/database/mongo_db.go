@@ -79,17 +79,19 @@ func StartMongoHealthCheck(interval time.Duration) {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
 		for range ticker.C {
-			if readMongoClient.Load() != nil && readClientOptions != nil {
+			// 检查读客户端 - 避免重复Load
+			if readClient := readMongoClient.Load(); readClient != nil && readClientOptions != nil {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-				if err := readMongoClient.Load().Ping(ctx, readpref.Primary()); err != nil {
+				if err := readClient.Ping(ctx, readpref.Primary()); err != nil {
 					printer.TextWarn("MongoHealthCheck", "ReadClient ping fail, reconnecting", err.Error())
 					readMongoClient.Store(CreateReadWriteMongoClient(readClientOptions))
 				}
 				cancel()
 			}
-			if writeMongoClient.Load() != nil && writeClientOptions != nil {
+			// 检查写客户端 - 避免重复Load
+			if writeClient := writeMongoClient.Load(); writeClient != nil && writeClientOptions != nil {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-				if err := writeMongoClient.Load().Ping(ctx, readpref.Primary()); err != nil {
+				if err := writeClient.Ping(ctx, readpref.Primary()); err != nil {
 					printer.TextWarn("MongoHealthCheck", "WriteClient ping fail, reconnecting", err.Error())
 					writeMongoClient.Store(CreateReadWriteMongoClient(writeClientOptions))
 				}
@@ -101,13 +103,11 @@ func StartMongoHealthCheck(interval time.Duration) {
 
 // 插入文档
 func MongoInsert(fileDBName, collectionName string, bJsonInterface interface{}) (bool, string) {
-	var m *mongo.Client = nil
-	if m = GetWriteMongoClient(); m == nil {
+	m := writeMongoClient.Load()
+	if m == nil {
 		return false, "Mongo Get Write Client Fail While MongoInsert"
 	}
 
-	//选择fileDBName文档数据库的collectionName集合
-	resultString := ""
 	collection := m.Database(fileDBName).Collection(collectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
 	defer cancel()
@@ -116,20 +116,16 @@ func MongoInsert(fileDBName, collectionName string, bJsonInterface interface{}) 
 		return false, fmt.Sprintf("ERRO:%v", err.Error())
 	}
 
-	if insertResult != nil {
-		resultString = fmt.Sprintf("Document CmdResult With ID:%v", insertResult.InsertedID)
-	}
-	return true, resultString
+	return true, fmt.Sprintf("Document CmdResult With ID:%v", insertResult.InsertedID)
 }
 
 // 删除文档
 func MongoDelete(fileDBName, collectionName string, bJsonInterface interface{}) (bool, string) {
-	var m *mongo.Client = nil
-	if m = GetWriteMongoClient(); m == nil {
+	m := writeMongoClient.Load()
+	if m == nil {
 		return false, "Mongo Get Write Client Fail While MongoDelete"
 	}
 
-	resultString := ""
 	collection := m.Database(fileDBName).Collection(collectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
 	defer cancel()
@@ -138,20 +134,16 @@ func MongoDelete(fileDBName, collectionName string, bJsonInterface interface{}) 
 		return false, fmt.Sprintf("ERRO:%v", err.Error())
 	}
 
-	if deleteResult != nil {
-		resultString = fmt.Sprintf("Deleted documents:%v", deleteResult.DeletedCount)
-	}
-	return true, resultString
+	return true, fmt.Sprintf("Deleted documents:%v", deleteResult.DeletedCount)
 }
 
 // 更新文档
 func MongoUpdate(fileDBName, collectionName string, bJsonOldInterface, bJsonNewInterface interface{}) (bool, string) {
-	var m *mongo.Client = nil
-	if m = GetWriteMongoClient(); m == nil {
+	m := writeMongoClient.Load()
+	if m == nil {
 		return false, "Mongo Get Write Client Fail While MongoUpdate"
 	}
 
-	resultString := ""
 	collection := m.Database(fileDBName).Collection(collectionName)
 	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
 	defer cancel()
@@ -160,48 +152,40 @@ func MongoUpdate(fileDBName, collectionName string, bJsonOldInterface, bJsonNewI
 		return false, fmt.Sprintf("ERRO:%v", err.Error())
 	}
 
-	if updateResult != nil {
-		resultString = fmt.Sprintf("Matched Documents:%v", updateResult.MatchedCount)
-		resultString = fmt.Sprintf("%v, Modified Documents:%v", resultString, updateResult.ModifiedCount)
-	}
-
-	return true, resultString
+	return true, fmt.Sprintf("Matched Documents:%v, Modified Documents:%v", updateResult.MatchedCount, updateResult.ModifiedCount)
 }
 
 // FindOne方法：查询文档
 func MongoFindOne(fileDBName, collectionName string, searchInterface interface{}) (bool, string, bson.M) {
-	var m *mongo.Client = nil
-	if m = GetReadMongoClient(); m == nil {
+	m := readMongoClient.Load()
+	if m == nil {
 		return false, "Mongo Get Read Client Fail While MongoFind", nil
 	}
 
-	//获取文档对象
 	collection := m.Database(fileDBName).Collection(collectionName)
 	if collection == nil {
 		return false, fmt.Sprintf("Database(%v).Collection(%v) Fail", fileDBName, collectionName), nil
 	}
 
-	//查找符合索引条件的结果
 	var singleResult bson.M
 	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
 	defer cancel()
-	mSingleResult := collection.FindOne(ctx, searchInterface).Decode(&singleResult)
-	if mSingleResult == nil {
+
+	if err := collection.FindOne(ctx, searchInterface).Decode(&singleResult); err == nil {
 		return true, "", singleResult
-
-	} else if errors.Is(mSingleResult, mongo.ErrNoDocuments) {
+	} else if errors.Is(err, mongo.ErrNoDocuments) {
 		return false, fmt.Sprintf("No Document Found ,searchInterface = %v", searchInterface), nil
+	} else {
+		errStr := "Mongo MongoFindOne Error: " + err.Error()
+		printer.TextError(errStr)
+		return false, errStr, nil
 	}
-
-	erStr := fmt.Sprintf("Mongo MongoFindOne Error: " + mSingleResult.Error())
-	printer.TextError(erStr)
-	return false, erStr, nil
 }
 
 // 计算集合行数的接口
 func MongoCountLine(fileDBName, collectionName string) (bool, string, int64) {
-	var m *mongo.Client = nil
-	if m = GetReadMongoClient(); m == nil {
+	m := readMongoClient.Load()
+	if m == nil {
 		return false, "Mongo Get Read Client Fail While MongoCountLine", 0
 	}
 
@@ -212,9 +196,131 @@ func MongoCountLine(fileDBName, collectionName string) (bool, string, int64) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
 	defer cancel()
-	count, e := collection.CountDocuments(ctx, bson.D{})
-	if e != nil {
+	count, err := collection.CountDocuments(ctx, bson.D{})
+	if err != nil {
 		return false, fmt.Sprintf("fileDBName(%v).collection(%v).CountDocuments() Fail", fileDBName, collectionName), 0
 	}
 	return true, "", count
 }
+
+// MongoBatchInsert 批量插入文档（提升性能）
+func MongoBatchInsert(fileDBName, collectionName string, documents []interface{}) (bool, string) {
+	if len(documents) == 0 {
+		return false, "Empty documents array"
+	}
+
+	m := writeMongoClient.Load()
+	if m == nil {
+		return false, "Mongo Get Write Client Fail While MongoBatchInsert"
+	}
+
+	collection := m.Database(fileDBName).Collection(collectionName)
+	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
+	defer cancel()
+
+	insertResult, err := collection.InsertMany(ctx, documents)
+	if err != nil {
+		return false, fmt.Sprintf("ERRO:%v", err.Error())
+	}
+
+	return true, fmt.Sprintf("Inserted %d documents", len(insertResult.InsertedIDs))
+}
+
+// MongoBatchDelete 批量删除文档
+func MongoBatchDelete(fileDBName, collectionName string, filter interface{}) (bool, string) {
+	m := writeMongoClient.Load()
+	if m == nil {
+		return false, "Mongo Get Write Client Fail While MongoBatchDelete"
+	}
+
+	collection := m.Database(fileDBName).Collection(collectionName)
+	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
+	defer cancel()
+
+	deleteResult, err := collection.DeleteMany(ctx, filter)
+	if err != nil {
+		return false, fmt.Sprintf("ERRO:%v", err.Error())
+	}
+
+	return true, fmt.Sprintf("Deleted %d documents", deleteResult.DeletedCount)
+}
+
+// MongoBatchUpdate 批量更新文档
+func MongoBatchUpdate(fileDBName, collectionName string, filter, update interface{}) (bool, string) {
+	m := writeMongoClient.Load()
+	if m == nil {
+		return false, "Mongo Get Write Client Fail While MongoBatchUpdate"
+	}
+
+	collection := m.Database(fileDBName).Collection(collectionName)
+	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
+	defer cancel()
+
+	updateResult, err := collection.UpdateMany(ctx, filter, update)
+	if err != nil {
+		return false, fmt.Sprintf("ERRO:%v", err.Error())
+	}
+
+	return true, fmt.Sprintf("Matched:%v Modified:%v", updateResult.MatchedCount, updateResult.ModifiedCount)
+}
+
+// MongoFind 查询多个文档（支持limit和skip分页）
+func MongoFind(fileDBName, collectionName string, filter interface{}, limit, skip int64) (bool, string, []bson.M) {
+	m := readMongoClient.Load()
+	if m == nil {
+		return false, "Mongo Get Read Client Fail While MongoFind", nil
+	}
+
+	collection := m.Database(fileDBName).Collection(collectionName)
+	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
+	defer cancel()
+
+	findOptions := options.Find()
+	if limit > 0 {
+		findOptions.SetLimit(limit)
+	}
+	if skip > 0 {
+		findOptions.SetSkip(skip)
+	}
+
+	cursor, err := collection.Find(ctx, filter, findOptions)
+	if err != nil {
+		return false, fmt.Sprintf("ERRO:%v", err.Error()), nil
+	}
+	defer cursor.Close(ctx)
+
+	var results []bson.M
+	if err = cursor.All(ctx, &results); err != nil {
+		return false, fmt.Sprintf("ERRO:%v", err.Error()), nil
+	}
+
+	return true, fmt.Sprintf("Found %d documents", len(results)), results
+}
+
+// MongoCreateIndex 创建索引（优化查询性能）
+func MongoCreateIndex(fileDBName, collectionName string, keys bson.D, unique bool) (bool, string) {
+	m := writeMongoClient.Load()
+	if m == nil {
+		return false, "Mongo Get Write Client Fail While MongoCreateIndex"
+	}
+
+	collection := m.Database(fileDBName).Collection(collectionName)
+	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
+	defer cancel()
+
+	indexModel := mongo.IndexModel{
+		Keys: keys,
+	}
+	if unique {
+		indexModel.Options = options.Index().SetUnique(true)
+	}
+
+	indexName, err := collection.Indexes().CreateOne(ctx, indexModel)
+	if err != nil {
+		return false, fmt.Sprintf("ERRO:%v", err.Error())
+	}
+
+	printer.TextInfo("MongoCreateIndex", "Created index", indexName, "on", collectionName)
+	return true, fmt.Sprintf("Index created: %s", indexName)
+}
+
