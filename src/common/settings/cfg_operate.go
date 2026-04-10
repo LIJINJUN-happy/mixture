@@ -6,6 +6,7 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"mixture/src/common/printer"
 	"os"
+	"path/filepath"
 	"time"
 )
 
@@ -71,7 +72,7 @@ func StartFileWatcher() {
 				if !ok {
 					return
 				}
-				if event.Has(fsnotify.Write) {
+				if event.Has(fsnotify.Write) && filepath.Ext(event.Name) == ".json" {
 					lastFile = event.Name
 					debounce.Reset(500 * time.Millisecond)
 				}
