@@ -304,7 +304,6 @@ func SendGateIDToRemoteSer(cn *net.Conn, linkerName string) {
 		if errorGateInfo != nil {
 			printer.TextError("SendGateIDToRemoteSer", "proto.Marshal Error", errorGateInfo.Error())
 			panic(errorGateInfo)
-			return
 		}
 		dataSize = copy(dateByte, protoBufData)
 	} else {
@@ -313,7 +312,6 @@ func SendGateIDToRemoteSer(cn *net.Conn, linkerName string) {
 		if errorGateInfo != nil {
 			printer.TextError("SendGateIDToRemoteSer", "json.Marshal Error", errorGateInfo.Error())
 			panic(errorGateInfo)
-			return
 		}
 		dataSize = copy(dateByte, jsonData)
 	}
