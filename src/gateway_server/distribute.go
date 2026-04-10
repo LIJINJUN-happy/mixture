@@ -42,8 +42,7 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 
 		//池化获取内存
 		dataLen := element - beginIdx + extraLen
-		poolObject := DistributeDataPool.Get()
-		bufPtr, ok := poolObject.(*[]byte)
+		bufPtr, ok := DistributeDataPool.Get().(*[]byte)
 		if !ok {
 			printer.TextError("DoDistribute", "Err", "DistributeDataPool Get Fail")
 			return
