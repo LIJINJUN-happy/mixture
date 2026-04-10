@@ -271,7 +271,10 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 	dataSlice := make([]byte, gateway_server.ReadStreamBufferSize)
 	for {
 		select {
-		case bufPtr := <-sCoon.sendChannel:
+		case bufPtr, ok := <-sCoon.sendChannel:
+			if !ok || bufPtr == nil {
+				return // channel 已关闭，正常退出
+			}
 			if sCoon.gateSerConn != nil {
 				if num := gateway_server.DoPack(dataSlice, *bufPtr, 1); num > 0 {
 					_, writeErr := (*sCoon.gateSerConn).Write(dataSlice[0:num])
@@ -312,7 +315,10 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
 	fun := s.GetDisposeFunc()
 	for {
 		select {
-		case receiveData := <-sCoon.receiveChannel:
+		case receiveData, ok := <-sCoon.receiveChannel:
+			if !ok || receiveData == nil {
+				return
+			}
 			dataSlice, conversionResult := receiveData.([]byte)
 			if !conversionResult {
 				//feedback := fmt.Sprintf("Ser:%v-%v, dispose receiveData conversion []byte Fail:%v", sInfo.ServerName, sInfo.ServerId, receiveData)
