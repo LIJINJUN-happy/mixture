@@ -131,11 +131,9 @@ func DoInit(db *sql.DB) error {
 func BeginLinkServer(sl *SerLinker) {
 	go func(serLinker *SerLinker) {
 		defer func(s *SerLinker) {
-			//通知停止处理(*dialObject).Write操作,因为panic重启该协程,会造成旧的write协程没被销毁从而协程泄露
-			s.receiveChannel <- nil
 			if s.serConn != nil {
-				closeErr := (*s.serConn).Close() //关闭旧socket,链接成功会重新赋值一个新的socket
-				if closeErr != nil {
+				s.receiveChannel <- nil //通知停止处理(*dialObject).Write操作,因为panic重启该协程,会造成旧的write协程没被销毁从而协程泄露
+				if closeErr := (*s.serConn).Close(); closeErr != nil {
 					printer.TextError(s.linkerName, " dial.Close() Failed With Defer", closeErr)
 				}
 			}
