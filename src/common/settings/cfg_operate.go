@@ -77,7 +77,7 @@ func StartFileWatcher() {
 				}
 			case <-debounce.C:
 				if lastFile != "" {
-					printer.TextInfo("HotReload", "Config file changed, reloading...", "file", lastFile)
+					printer.TextInfo("HotReload", "Config file changed, reloading file", lastFile)
 					DoLoad(false, lastFile)
 					lastFile = ""
 				}
