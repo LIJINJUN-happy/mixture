@@ -36,15 +36,15 @@ func MongoDBConnectClientInit(serName, processId string) {
 			writeClientOptions = options.Client().ApplyURI("mongodb://" + userAndPassWord + mongoWriteDBAddr + ":" + mongoWriteDBPort)
 
 			//创建读写池（读写分离）
-			readMongoClient.Store(CreateReadWriteMongoClient(readClientOptions))
-			writeMongoClient.Store(CreateReadWriteMongoClient(writeClientOptions))
+			readMongoClient.Store(CreateMongoClient(readClientOptions))
+			writeMongoClient.Store(CreateMongoClient(writeClientOptions))
 		} else {
 			panic("MongoDB Init Error: netDB Connect Fail: " + res.Error())
 		}
 	}
 }
 
-func CreateReadWriteMongoClient(opc *options.ClientOptions) *mongo.Client {
+func CreateMongoClient(opc *options.ClientOptions) *mongo.Client {
 	opc.SetMaxPoolSize(maxPoolSize)
 	opc.SetMinPoolSize(minPoolSize)
 
@@ -65,14 +65,6 @@ func CreateReadWriteMongoClient(opc *options.ClientOptions) *mongo.Client {
 	return client
 }
 
-func GetReadMongoClient() *mongo.Client {
-	return readMongoClient.Load()
-}
-
-func GetWriteMongoClient() *mongo.Client {
-	return writeMongoClient.Load()
-}
-
 // StartMongoHealthCheck 后台定期 ping，连接断开时自动重建客户端，不影响业务调用路径
 func StartMongoHealthCheck(interval time.Duration) {
 	go func() {
@@ -84,7 +76,7 @@ func StartMongoHealthCheck(interval time.Duration) {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				if err := readClient.Ping(ctx, readpref.Primary()); err != nil {
 					printer.TextWarn("MongoHealthCheck", "ReadClient ping fail, reconnecting", err.Error())
-					readMongoClient.Store(CreateReadWriteMongoClient(readClientOptions))
+					readMongoClient.Store(CreateMongoClient(readClientOptions))
 				}
 				cancel()
 			}
@@ -93,7 +85,7 @@ func StartMongoHealthCheck(interval time.Duration) {
 				ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 				if err := writeClient.Ping(ctx, readpref.Primary()); err != nil {
 					printer.TextWarn("MongoHealthCheck", "WriteClient ping fail, reconnecting", err.Error())
-					writeMongoClient.Store(CreateReadWriteMongoClient(writeClientOptions))
+					writeMongoClient.Store(CreateMongoClient(writeClientOptions))
 				}
 				cancel()
 			}
@@ -162,15 +154,11 @@ func MongoFindOne(fileDBName, collectionName string, searchInterface interface{}
 		return false, "Mongo Get Read Client Fail While MongoFind", nil
 	}
 
-	collection := m.Database(fileDBName).Collection(collectionName)
-	if collection == nil {
-		return false, fmt.Sprintf("Database(%v).Collection(%v) Fail", fileDBName, collectionName), nil
-	}
-
 	var singleResult bson.M
 	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
 	defer cancel()
 
+	collection := m.Database(fileDBName).Collection(collectionName)
 	if err := collection.FindOne(ctx, searchInterface).Decode(&singleResult); err == nil {
 		return true, "", singleResult
 	} else if errors.Is(err, mongo.ErrNoDocuments) {
@@ -189,16 +177,13 @@ func MongoCountLine(fileDBName, collectionName string) (bool, string, int64) {
 		return false, "Mongo Get Read Client Fail While MongoCountLine", 0
 	}
 
-	collection := m.Database(fileDBName).Collection(collectionName)
-	if collection == nil {
-		return false, fmt.Sprintf("Database(%v).Collection(%v) Fail", fileDBName, collectionName), 0
-	}
-
 	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
 	defer cancel()
-	count, err := collection.CountDocuments(ctx, bson.D{})
+
+	collection := m.Database(fileDBName).Collection(collectionName)
+	count, err := collection.EstimatedDocumentCount(ctx)
 	if err != nil {
-		return false, fmt.Sprintf("fileDBName(%v).collection(%v).CountDocuments() Fail", fileDBName, collectionName), 0
+		return false, fmt.Sprintf("fileDBName(%v).collection(%v).EstimatedDocumentCount() Fail", fileDBName, collectionName), 0
 	}
 	return true, "", count
 }
@@ -323,4 +308,3 @@ func MongoCreateIndex(fileDBName, collectionName string, keys bson.D, unique boo
 	printer.TextInfo("MongoCreateIndex", "Created index", indexName, "on", collectionName)
 	return true, fmt.Sprintf("Index created: %s", indexName)
 }
-
