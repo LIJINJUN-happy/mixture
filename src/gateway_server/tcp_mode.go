@@ -64,7 +64,6 @@ func DoWriteMsg(newConn *NewConnection) {
 
 	defer func() {
 		newConn.ReduceFromGateMap() //移除Map中的客户端元素
-		(*newConn).Close()
 		clientWriteGoroutineNum.Add(-1) //写协程数量同步变动减少
 	}()
 
