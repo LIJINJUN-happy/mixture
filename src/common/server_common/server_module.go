@@ -103,6 +103,7 @@ func (mod *ServerModule) LoadMod(wg *sync.WaitGroup) {
 		if err := recover(); err != nil {
 			printer.TextError("LoadMod", "ServerName", ServicePrt.ServerName, "ServerId", ServicePrt.ServerId, "modName", mod.modName, "Error", err)
 		}
+		wg.Done()
 	}()
 
 	for {
@@ -112,7 +113,6 @@ func (mod *ServerModule) LoadMod(wg *sync.WaitGroup) {
 			if downRes != nil {
 				printer.PanicStack(downRes)
 			}
-			wg.Done()
 		case receiptData := <-mod.receiptChan: //监听模块接收数据通知
 			if protoPack, transProtoPack := receiptData.(*ProtoPackInfo); transProtoPack {
 				mod.HandleProtoPack(protoPack)

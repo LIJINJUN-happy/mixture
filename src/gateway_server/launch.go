@@ -133,10 +133,11 @@ func BeginLinkServer(sl *SerLinker) {
 		defer func(s *SerLinker) {
 			//通知停止处理(*dialObject).Write操作,因为panic重启该协程,会造成旧的write协程没被销毁从而协程泄露
 			s.receiveChannel <- nil
-
-			closeErr := (*s.serConn).Close() //关闭旧socket,链接成功会重新赋值一个新的socket
-			if closeErr != nil {
-				printer.TextError(s.linkerName, " dial.Close() Failed With Defer", closeErr)
+			if s.serConn != nil {
+				closeErr := (*s.serConn).Close() //关闭旧socket,链接成功会重新赋值一个新的socket
+				if closeErr != nil {
+					printer.TextError(s.linkerName, " dial.Close() Failed With Defer", closeErr)
+				}
 			}
 			time.Sleep(10 * time.Second)
 			go BeginLinkServer(s)
@@ -207,15 +208,9 @@ func BeginLinkServer(sl *SerLinker) {
 func DealWithLinkerData(linker *SerLinker) {
 	defer func(s *SerLinker) {
 		if r := recover(); r != nil {
-			//panic容错处理,由于Read协程panic或者退出都会通知dealWithLinkerData协程来同步协程的退出.所以假如该协程panic应让Read协程触发错误来通知该协程退出
-			closeRes := (*s.serConn).Close()
-			if closeRes != nil {
-				printer.TextError("dealWithLinkerData Close Linker Conn Fail", "closeRes", closeRes.Error())
-			} else {
-				for range s.receiveChannel {
-					printer.TextInfo("dealWithLinkerData Quit")
-					return
-				}
+			printer.TextError("DealWithLinkerData Panic", "Error", r)
+			if s.serConn != nil {
+				(*s.serConn).Close()
 			}
 		}
 	}(linker)

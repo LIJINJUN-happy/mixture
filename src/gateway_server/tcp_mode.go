@@ -102,12 +102,12 @@ func DoReadMsg(newConn *NewConnection) {
 	printer.TextDebug("clientReadGoroutineNum current value", "clientReadGoroutineNum", clientReadGoroutineNum.Load())
 
 	defer func() {
-		newConn.rwChannel <- GoroutineSyncBreakSign
-		close(newConn.rwChannel) //通知Write线程并关闭通知通道
-		(*newConn).Close()       //关闭套接字（关闭conn对象）
 		if r := recover(); r != nil {
 			printer.TextError("GateInfo.newConnPanic", "Recover", r, "Stack Trace", string(debug.Stack()))
 		}
+		newConn.rwChannel <- GoroutineSyncBreakSign
+		close(newConn.rwChannel)       //通知Write线程并关闭通知通道
+		(*newConn).Close()             //关闭套接字（关闭conn对象）
 		clientReadGoroutineNum.Add(-1) //读协程数量同步变动减少
 	}()
 
