@@ -30,8 +30,9 @@ func main() {
 		return
 	}
 
-	//加载配置
+	//加载配置(加载后监听配置文件变更自动热更)
 	settings.DoLoad(true, "")
+	settings.StartFileWatcher()
 
 	//初始化服务进程Log日志
 	serName, processId := os.Args[1], os.Args[2]

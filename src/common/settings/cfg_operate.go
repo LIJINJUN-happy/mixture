@@ -51,7 +51,7 @@ func ReloadConfig[T any](path string, store func(*T)) error {
 	return nil
 }
 
-// StartFileWatcher 监听 settings/ 目录，文件变更后自动热更配置
+// 监听 settings/ 目录，文件变更后自动热更配置
 func StartFileWatcher() {
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
@@ -94,4 +94,8 @@ func StartFileWatcher() {
 	if err = watcher.Add("./settings"); err != nil {
 		printer.TextError("FileWatcher", "add path failed", err.Error())
 	}
+}
+
+func PathClean(loadAssignPath, settingsPath string) bool {
+	return filepath.Clean(loadAssignPath) == filepath.Clean(settingsPath)
 }
