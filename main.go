@@ -23,11 +23,9 @@ import (
 func main() {
 	if len(os.Args) != 3 {
 		panic("Os.Args size is not right, Make sure the three parameters are met")
-		return
 	}
 	if _, isNumber := strconv.Atoi(os.Args[2]); isNumber != nil {
 		panic("Os.Args[2] Must Be Integer")
-		return
 	}
 
 	//加载配置(加载后监听配置文件变更自动热更)

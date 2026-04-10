@@ -26,11 +26,9 @@ func LoadConfig[T any](path string, store func(*T)) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		panic(fmt.Sprintf("Failed To Read Config File: %s, Error: %v", path, err))
-		return
 	}
 	if errUnmarshal := json.Unmarshal(data, cfg); errUnmarshal != nil {
 		panic(fmt.Sprintf("Failed To Unmarshal Config File: %s, Error: %v", path, errUnmarshal))
-		return
 	}
 	store(cfg)
 	//fmt.Println("LoadConfig Success：" + path)

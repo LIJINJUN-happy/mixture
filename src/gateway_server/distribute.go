@@ -156,7 +156,6 @@ func init() {
 	data, err := os.ReadFile(allProtoPath)
 	if err != nil {
 		panic("allprotocol.json read fail, allProtoPath:" + allProtoPath)
-		return
 	}
 
 	//获取版本号（用于和前端区分协议版本）
@@ -164,19 +163,16 @@ func init() {
 	err = json.Unmarshal(data, &allProto)
 	if err != nil {
 		panic("allprotocol.json Unmarshal fail, err:" + err.Error())
-		return
 	}
 	if versionString, findVersion := allProto["_Version_"]; findVersion {
 		ProtocolDistributeInfo.ProtoVersion = versionString.(string)
 	} else {
 		panic("allprotocol.json Get _Version_ fail")
-		return
 	}
 
 	//加载协议内容
 	if !(ProtocolDistributeInfo.ProtocolType == "protobuf" || ProtocolDistributeInfo.ProtocolType == "json") {
 		panic("ProtocolType is nil, protocolType:" + ProtocolDistributeInfo.ProtocolType)
-		return
 	}
 	LoadProtocol("./proto/distribute_config.json", allProto)
 	CheckLoadProtocol()
@@ -246,7 +242,6 @@ func LoadProtocol(path string, allProto map[string]interface{}) {
 			}
 			if protoStartNum == 0 {
 				panic("interior_pb switch sendServerTarget Fail, distributeHead = " + distributeHead + " ,sendServerTarget = " + sendServerTarget)
-				return
 			}
 			lenOfValue := v.Field(k).Len()
 			for idx := 0; idx < lenOfValue; idx++ {
@@ -265,7 +260,6 @@ func LoadProtocol(path string, allProto map[string]interface{}) {
 				proName := v.Field(k).Interface().([]string)[idx]
 				if num, findProtoNum := allProto[proName]; !findProtoNum {
 					panic("mutual_pb read numStr Fail, proName = " + proName)
-					return
 				} else {
 					ptoNum := uint16(num.(float64))
 					ProtocolDistributeInfo.ProtoDistributeMap[proName] = sendServerTarget
