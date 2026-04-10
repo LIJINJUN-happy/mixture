@@ -69,7 +69,7 @@ func DoInit(db *sql.DB) error {
 			WhiteListPtr.IsActive = true
 		}
 	} else {
-		return fmt.Errorf("whiteIPListDefaultStatus Error Status &v", whiteStatus)
+		return fmt.Errorf("whiteIPListDefaultStatus Error Status %v", whiteStatus)
 	}
 	printer.TextInfo("doInit", "WhiteList Init Map Info", (*WhiteListPtr).WhiteMap, "Active", (*WhiteListPtr).IsActive)
 

@@ -17,7 +17,7 @@ import (
 var mongoOpTimeout = 5 * time.Second
 var writeMongoClient atomic.Pointer[mongo.Client]
 var readMongoClient atomic.Pointer[mongo.Client]
-var maxPoolSize, minPoolSize = uint64(100), uint64(0)
+var maxPoolSize, minPoolSize = uint64(100), uint64(10)
 var readClientOptions, writeClientOptions *options.ClientOptions = nil, nil
 var mongoReadDBAddr, mongoReadDBPort, mongoWriteDBAddr, mongoWriteDBPort string
 

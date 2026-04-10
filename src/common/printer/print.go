@@ -1,6 +1,7 @@
 package printer
 
 import (
+	"fmt"
 	"log/slog"
 	"mixture/src/common/tools"
 	"os"
@@ -135,7 +136,14 @@ func PanicStack(e any) {
 	n := runtime.Stack(panicBuff[:], false)
 	str := strings.Replace(string(panicBuff[:n]), "\n", "  ", -1)
 	str = strings.Replace(str, "\t", "  ", -1)
-	TextError(e.(error).Error(), "Panic Stack", str)
+
+	var errMsg string
+	if err, ok := e.(error); ok {
+		errMsg = err.Error()
+	} else {
+		errMsg = fmt.Sprintf("%v", e)
+	}
+	TextError(errMsg, "Panic Stack", str)
 }
 
 // 记录日志数据调用（一般是模块日志记录，用于后续查询日志排查问题）
