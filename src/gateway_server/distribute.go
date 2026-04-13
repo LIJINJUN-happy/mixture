@@ -283,18 +283,19 @@ func CheckLoadProtocol() {
 
 // Gate进程发送协议去服务进程
 func SendMsg2Server(sessionId uint32, protoName string, data []byte) {
-	newData := make([]byte, 60)
 	p, searchRes := ProtocolDistributeInfo.ProtoNameMap[protoName]
 	if !searchRes {
 		printer.TextError("SendMsg2Server Fail", "protoName", protoName, "data", data, "pnum", p)
 		return
 	}
+	// sliceBuffer 格式：[ProtoNum(2B)][Data]，SessionID 由 DoDistribute 追加
+	newData := make([]byte, ProtoNumLen+len(data))
 	binary.BigEndian.PutUint16(newData[0:], p)
-	newData = append(newData[:ProtoNumLen], data...)
+	copy(newData[ProtoNumLen:], data)
 	printer.TextInfo("SendMsg2Server", "protoName", protoName, "data", data, "pnum", p, "newData", newData)
 
 	//调用派发协议接口送出协议
 	var cutList CutIndexList
-	cutList.Push(len(data) + HeadLen)
-	DoDistribute(&cutList, newData[0:], sessionId)
+	cutList.Push(ProtoNumLen + len(data))
+	DoDistribute(&cutList, newData, sessionId)
 }
