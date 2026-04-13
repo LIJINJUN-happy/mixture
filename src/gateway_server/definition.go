@@ -260,7 +260,12 @@ func (w *WhiteList) CheckWhiteIP(addr string) bool {
 		return true //假如没开启白名单则直接默认返回true即可,无需检测
 	}
 
-	if _, ok := w.WhiteMap[addr]; ok {
+	// addr 格式为 "ip:port"，提取纯 IP 部分后再比对白名单
+	ip, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false
+	}
+	if _, ok := w.WhiteMap[ip]; ok {
 		return true
 	}
 	return false
