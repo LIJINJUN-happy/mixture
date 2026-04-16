@@ -218,10 +218,16 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 	//开启两个协程分别处理该连接对象的发送和接收逻辑
 	// ctx 生命周期与本连接一致，BeginService return 时 defer cancel() 自动通知 Transmit/Dispose 退出
 	ctx, cancel := context.WithCancel(context.Background())
+	handshakeDone := make(chan struct{}, 1) // buffered，Dispose 先完成也不会阻塞
 	defer cancel()
 	go s.Transmit(sCoon, ctx)
-	go s.Dispose(sCoon, ctx)
-	time.Sleep(3 * time.Second) //等待Dispose协程启动完成，避免还未开始读取receiveChannel，当前协程就往receiveChannel塞入而panic
+	go s.Dispose(sCoon, ctx, handshakeDone)
+	select {
+	case <-handshakeDone:
+	case <-time.After(10 * time.Second): // 兜底超时，防止握手包永远不来
+		printer.TextError("BeginService", "Handshake Timeout", sCoon.GetGateIPAddr())
+		return
+	}
 
 	//读取网关发送过来的数据
 	readObj := new(gateway_server.ReadStreamBufferObject)
@@ -300,7 +306,7 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj, ctx context.Context) {
 	}
 }
 
-func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
+func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context, handshakeDone chan<- struct{}) {
 	defer func(s *SerConnObj) {
 		if r := recover(); r != nil {
 			printer.PanicStack(r)
@@ -360,6 +366,7 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
 				if !s.CheckConnObjIsExist(gateID) {
 					sCoon.SetGateId(gateID) //设置网关标识
 					curGateSize := s.AddConnObj(sCoon)
+					handshakeDone <- struct{}{} //握手完成，通知 BeginService 可以开始读业务数据了
 					printer.TextInfo("Dispose SYN GateId", "From GateLinker", linkerName, "GateID", gateID, "ConnObjMapSize", curGateSize)
 				} else {
 					//否者直接断开连接
