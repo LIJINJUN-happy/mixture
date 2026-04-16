@@ -3,15 +3,17 @@ package server_common
 import (
 	"mixture/src/common/printer"
 	"net"
+	"sync"
 )
 
 // 网关连接到服务的连接结构体定义
 type SerConnObj struct {
-	gateId         int       //连接过来的网关的ID标识
-	gateAddr       string    //连接过来的网关的IP地址
-	gateSerConn    *net.Conn //和gateway_ser连接的connection
+	gateId         int         //连接过来的网关的ID标识
+	gateAddr       string      //连接过来的网关的IP地址
+	gateSerConn    *net.Conn   //和gateway_ser连接的connection
 	sendChannel    chan *[]byte //发送数据的通信道(由transmit协程发数据回GateWay)
-	receiveChannel chan any  //接收数据的通信道（接收后存入该管道,由dispose协程处理）
+	receiveChannel chan any     //接收数据的通信道（接收后存入该管道,由dispose协程处理）
+	closeOnce      sync.Once   //保证Close只执行一次，防止多协程并发调用产生data race
 }
 
 func (s *SerConnObj) Init(conn *net.Conn) (bool, string) {
@@ -51,10 +53,12 @@ func (s *SerConnObj) GetGateIPAddr() string {
 }
 
 func (s *SerConnObj) Close(funcCmd string) {
-	if s.gateSerConn != nil {
-		if closeError := (*s.gateSerConn).Close(); closeError != nil {
-			printer.TextError("GateSerConn Close Fail", "Close Error", closeError.Error(), "funcCmd", funcCmd)
+	s.closeOnce.Do(func() {
+		if s.gateSerConn != nil {
+			if closeError := (*s.gateSerConn).Close(); closeError != nil {
+				printer.TextError("GateSerConn Close Fail", "Close Error", closeError.Error(), "funcCmd", funcCmd)
+			}
+			s.gateSerConn = nil
 		}
-		s.gateSerConn = nil
-	}
+	})
 }

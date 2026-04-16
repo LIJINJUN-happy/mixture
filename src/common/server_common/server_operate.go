@@ -1,6 +1,7 @@
 package server_common
 
 import (
+	"context"
 	"database/sql"
 	"encoding/binary"
 	"encoding/json"
@@ -215,9 +216,12 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 	}(s, sCoon)
 
 	//开启两个协程分别处理该连接对象的发送和接收逻辑
-	go s.Transmit(sCoon)
-	go s.Dispose(sCoon)
-	time.Sleep(3 * time.Second) //等待Transmit和Dispose协程启动完成，避免还未设置网关ID就开始读取数据导致连接被关闭
+	// ctx 生命周期与本连接一致，BeginService return 时 defer cancel() 自动通知 Transmit/Dispose 退出
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go s.Transmit(sCoon, ctx)
+	go s.Dispose(sCoon, ctx)
+	time.Sleep(3 * time.Second) //等待Dispose协程启动完成，避免还未开始读取receiveChannel，当前协程就往receiveChannel塞入而panic
 
 	//读取网关发送过来的数据
 	readObj := new(gateway_server.ReadStreamBufferObject)
@@ -247,14 +251,18 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 			copyRes := copy(newByte, sliceBuffer[idx:elementIDX])
 			//printer.TextInfo("gateway_server DoSplit ", "CopyResNum", copyRes)
 			if copyRes > 0 {
-				sCoon.receiveChannel <- newByte
+				select {
+				case sCoon.receiveChannel <- newByte:
+				default:
+					return
+				}
 			}
 			idx = elementIDX
 		}
 	}
 }
 
-func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
+func (s *ServerInfo) Transmit(sCoon *SerConnObj, ctx context.Context) {
 	defer func(s *SerConnObj) {
 		if r := recover(); r != nil {
 			printer.PanicStack(r)
@@ -263,14 +271,12 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 		printer.TextInfo("Transmit Goroutine End........")
 	}(sCoon)
 
-	//创建定时器检测gate连接对象是否断开
-	loopTicker := time.NewTicker(TransmitDisposeTickerDuration)
-	defer loopTicker.Stop() //退出关闭定时器
-
 	//收取通信道传输过来切割好的数据包内容
 	dataSlice := make([]byte, gateway_server.ReadStreamBufferSize)
 	for {
 		select {
+		case <-ctx.Done(): //连接已关闭，退出发送协程
+			return
 		case bufPtr, ok := <-sCoon.sendChannel:
 			if !ok || bufPtr == nil {
 				return // channel 已关闭，正常退出
@@ -290,15 +296,11 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj) {
 			// 恢复容量后归还池，原始指针直接 Put，零逃逸，同时覆盖 DoPack<=0 分支
 			*bufPtr = (*bufPtr)[:cap(*bufPtr)]
 			DeliveryMsgBufPool.Put(bufPtr)
-		case <-loopTicker.C:
-			if sCoon.gateSerConn == nil {
-				return
-			}
 		}
 	}
 }
 
-func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
+func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
 	defer func(s *SerConnObj) {
 		if r := recover(); r != nil {
 			printer.PanicStack(r)
@@ -307,14 +309,13 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
 		printer.TextInfo("Dispose Goroutine End........")
 	}(sCoon)
 
-	disposeTicker := time.NewTicker(TransmitDisposeTickerDuration)
-	defer disposeTicker.Stop() //退出暂停定时器
-
 	//收取通信道传输过来切割好的数据包内容
 	dataIdxFrom := gateway_server.ProtoNumLen + gateway_server.SessionIdLen
 	fun := s.GetDisposeFunc()
 	for {
 		select {
+		case <-ctx.Done(): //连接已关闭，退出接收协程
+			return
 		case receiveData, ok := <-sCoon.receiveChannel:
 			if !ok || receiveData == nil {
 				return
@@ -367,10 +368,6 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj) {
 					(*ptr).Close()
 					printer.TextError("Dispose SYN GateId", "From GateLinker", linkerName, "Already Exist GateID", gateID)
 				}
-			}
-		case <-disposeTicker.C: //由于dispose协程内无法根据read或者write的报错触发error，只能根据conn是否被设为空来销毁协程
-			if sCoon.gateSerConn == nil {
-				return
 			}
 		}
 	}
