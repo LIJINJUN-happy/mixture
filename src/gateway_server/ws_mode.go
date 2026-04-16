@@ -2,7 +2,6 @@ package gateway_server
 
 import (
 	"mixture/src/common/printer"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,7 +13,7 @@ func DoRegister() {
 	http.HandleFunc("/test", TestFunc)  //测试例子
 }
 
-func BeginWebSocketSer(listenReady chan<- struct{}) {
+func BeginWebSocketSer() {
 	DoRegister()
 	address := strings.Join([]string{GateInfo.ip + ":", ""}, GateInfo.port)
 	var strBuild strings.Builder
@@ -24,15 +23,10 @@ func BeginWebSocketSer(listenReady chan<- struct{}) {
 	strBuild.WriteString(address)
 	strBuild.WriteString(" ...")
 	printer.TextInfo(strBuild.String())
-	ln, err := net.Listen("tcp", address[addrLen:])
+	err := http.ListenAndServe(address[addrLen:], nil) //默认监听本地,“:端口号”
 	if err != nil {
+		printer.TextError("Error Starting Gate_Server With WS Mode", "err", err)
 		panic("Listen Address Error: " + address)
-	}
-	if listenReady != nil {
-		listenReady <- struct{}{}
-	}
-	if serveErr := http.Serve(ln, nil); serveErr != nil {
-		printer.TextError("Error Starting Gate_Server With WS Mode", "err", serveErr)
 	}
 }
 

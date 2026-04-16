@@ -9,14 +9,11 @@ import (
 	"time"
 )
 
-func BeginTcpSer(listenReady chan<- struct{}) {
+func BeginTcpSer() {
 	address := strings.Join([]string{GateInfo.ip + ":", ""}, GateInfo.port)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		panic("Listen Address Error: " + address)
-	}
-	if listenReady != nil {
-		listenReady <- struct{}{}
 	}
 
 	defer func(l *net.Listener) {
@@ -66,7 +63,7 @@ func DoWriteMsg(newConn *NewConnection) {
 	printer.TextDebug("clientWriteGoroutineNum current value", "clientWriteGoroutineNum", clientWriteGoroutineNum.Load())
 
 	defer func() {
-		newConn.ReduceFromGateMap() //移除Map中的客户端元素
+		newConn.ReduceFromGateMap()     //移除Map中的客户端元素
 		clientWriteGoroutineNum.Add(-1) //写协程数量同步变动减少
 	}()
 
