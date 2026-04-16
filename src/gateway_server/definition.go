@@ -95,7 +95,7 @@ type SerLinker struct {
 	linkerName     string
 	address        string
 	receiveChannel chan *[]byte //用来接收所有将要派发到对应进程的数据（相当于连接器发送缓存通道）nil 表示关闭信号
-	serConn        *net.Conn   //链接xx服务进程的socket对象
+	serConn        *net.Conn    //链接xx服务进程的socket对象
 }
 
 // GateInformation for GateWaySer Object 网关服务相关参数
@@ -113,10 +113,10 @@ type GateInformation struct {
 
 // 客户端的session元素
 type clientSession struct {
-	session           uint32      //session分配数值
-	ip                net.IP      //客户端的IP地址
-	port              uint16      //端口值
-	wholeAddress      string      //端口+地址
+	session           uint32       //session分配数值
+	ip                net.IP       //客户端的IP地址
+	port              uint16       //端口值
+	wholeAddress      string       //端口+地址
 	clientBuffChannel chan *[]byte //客户端的接收协议的通信道
 }
 
@@ -298,7 +298,7 @@ func (c *CutIndexList) Push(v int) {
 		c.data[c.len] = v
 		c.len++
 	} else {
-		printer.TextWarn("CutIndexList", "MaxPacketsPerRead exceeded, packet dropped")
+		printer.TextWarn("CutIndexList MaxPacketsPerRead exceeded, packet dropped")
 	}
 }
 
