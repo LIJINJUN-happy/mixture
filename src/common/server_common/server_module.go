@@ -109,10 +109,10 @@ func (mod *ServerModule) LoadMod(wg *sync.WaitGroup) {
 	for {
 		select {
 		case <-mod.closeChan: //监听服务器关闭通知
-			downRes := mod.ServerDown()
-			if downRes != nil {
+			if downRes := mod.ServerDown(); downRes != nil {
 				printer.PanicStack(downRes)
 			}
+			return
 		case receiptData := <-mod.receiptChan: //监听模块接收数据通知
 			if protoPack, transProtoPack := receiptData.(*ProtoPackInfo); transProtoPack {
 				mod.HandleProtoPack(protoPack)
@@ -120,6 +120,7 @@ func (mod *ServerModule) LoadMod(wg *sync.WaitGroup) {
 				mod.HandleModulePack(modulePack)
 			} else {
 				printer.TextError("LoadMod receiptChan Pack Error", "receiptData", receiptData)
+				return
 			}
 		case <-modTimer.C:
 			modTimer.Stop()
