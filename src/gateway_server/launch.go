@@ -56,9 +56,9 @@ func DoInit(db *sql.DB) error {
 	}(db)
 
 	//白名单初始化逻辑
-	WhiteListPtr.WhiteMux.Lock()
-	WhiteListPtr.WhiteMap = make(map[string]string)
-	WhiteListPtr.WhiteMux.Unlock()
+	WhiteListPtr.whiteMux.Lock()
+	WhiteListPtr.whiteMap = make(map[string]string)
+	WhiteListPtr.whiteMux.Unlock()
 	if ipListStr := tools.GetSysValueByKey("whiteIPList"); len(ipListStr) > 0 {
 		for _, ip := range strings.Split(ipListStr, "|") {
 			WhiteListPtr.AddWhiteIP(ip) //加载IP白名单列表
@@ -71,7 +71,7 @@ func DoInit(db *sql.DB) error {
 	} else {
 		return fmt.Errorf("whiteIPListDefaultStatus Error Status %v", whiteStatus)
 	}
-	printer.TextInfo("doInit", "WhiteList Init Map Info", (*WhiteListPtr).WhiteMap, "Active", (*WhiteListPtr).IsActive)
+	printer.TextInfo("doInit", "WhiteList Init Map Info", WhiteListPtr.whiteMap, "Active", WhiteListPtr.IsActive)
 
 	GateInfo.sessionIdDistributionRecord.Store(0)
 	GateInfo.rebuildListenSec = 5

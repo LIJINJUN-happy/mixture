@@ -71,8 +71,8 @@ var WebSerLinker = new(SerLinker)
 
 // 白名单结构
 type WhiteList struct {
-	WhiteMux sync.RWMutex      //使用读写锁,因为绝大部分都是读比较多
-	WhiteMap map[string]string //白名单字典
+	whiteMux sync.RWMutex      //使用读写锁,因为绝大部分都是读比较多
+	whiteMap map[string]string //白名单字典
 	IsActive bool              //是否开启
 }
 
@@ -254,8 +254,8 @@ func (linker *SerLinker) InitLinker(linkerName string, db *sql.DB, linkerID int)
 }
 
 func (w *WhiteList) CheckWhiteIP(addr string) bool {
-	w.WhiteMux.RLock()
-	defer w.WhiteMux.RUnlock()
+	w.whiteMux.RLock()
+	defer w.whiteMux.RUnlock()
 	if !w.IsActive {
 		return true //假如没开启白名单则直接默认返回true即可,无需检测
 	}
@@ -265,27 +265,27 @@ func (w *WhiteList) CheckWhiteIP(addr string) bool {
 	if err != nil {
 		return false
 	}
-	if _, ok := w.WhiteMap[ip]; ok {
+	if _, ok := w.whiteMap[ip]; ok {
 		return true
 	}
 	return false
 }
 
 func (w *WhiteList) AddWhiteIP(addr string) {
-	w.WhiteMux.Lock()
-	defer w.WhiteMux.Unlock()
-	w.WhiteMap[addr] = addr
+	w.whiteMux.Lock()
+	defer w.whiteMux.Unlock()
+	w.whiteMap[addr] = addr
 }
 
 func (w *WhiteList) DelWhiteIP(addr string) {
-	w.WhiteMux.Lock()
-	defer w.WhiteMux.Unlock()
-	delete(w.WhiteMap, addr)
+	w.whiteMux.Lock()
+	defer w.whiteMux.Unlock()
+	delete(w.whiteMap, addr)
 }
 
 func (w *WhiteList) ChangeActiveStatus(cmd bool) {
-	w.WhiteMux.Lock()
-	defer w.WhiteMux.Unlock()
+	w.whiteMux.Lock()
+	defer w.whiteMux.Unlock()
 	w.IsActive = cmd
 }
 
