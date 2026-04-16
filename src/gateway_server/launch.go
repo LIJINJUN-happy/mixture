@@ -36,8 +36,14 @@ func Run() {
 	}
 
 	//Start Server
-	BeginGateServer()
-	time.Sleep(2 * time.Second)
+	listenReady := make(chan struct{}, 1)
+	BeginGateServer(listenReady)
+	select {
+	case <-listenReady:
+	case <-time.After(10 * time.Second):
+		printer.TextError("Run", "Gate Listen Timeout")
+		os.Exit(1)
+	}
 	BeginLinkServer(WebSerLinker)
 	BeginLinkServer(ActorSerLinker)
 	BeginLinkServer(ModularizedSerLinker)
@@ -239,7 +245,7 @@ func DealWithLinkerData(linker *SerLinker) {
 }
 
 /*使用defer搭配递归解决监听线程的崩溃*/
-func BeginGateServer() {
+func BeginGateServer(listenReady chan<- struct{}) {
 	if GateInfo.rebuildListenTimes.Load() >= maxGateRebuildListenTimes {
 		printer.TextError("Rebuild ListenTimes Exceeded.")
 		os.Exit(101)
@@ -252,10 +258,10 @@ func BeginGateServer() {
 					GateInfo.rebuildListenTimes.Add(1)
 					time.Sleep(GateInfo.rebuildListenSec * time.Second)
 					printer.TextWarn("重新启动tcp模式网关服务")
-					go BeginGateServer()
+					go BeginGateServer(nil)
 				}
 			}()
-			BeginTcpSer()
+			BeginTcpSer(listenReady)
 		}()
 	} else if GateInfo.workMode == "ws" {
 		go func() {
@@ -264,10 +270,10 @@ func BeginGateServer() {
 					GateInfo.rebuildListenTimes.Add(1)
 					time.Sleep(GateInfo.rebuildListenSec * time.Second)
 					printer.TextWarn("重新启动WebSocket模式网关服务")
-					go BeginGateServer()
+					go BeginGateServer(nil)
 				}
 			}()
-			BeginWebSocketSer()
+			BeginWebSocketSer(listenReady)
 		}()
 	}
 }

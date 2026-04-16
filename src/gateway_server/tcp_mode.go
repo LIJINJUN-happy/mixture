@@ -9,11 +9,14 @@ import (
 	"time"
 )
 
-func BeginTcpSer() {
+func BeginTcpSer(listenReady chan<- struct{}) {
 	address := strings.Join([]string{GateInfo.ip + ":", ""}, GateInfo.port)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		panic("Listen Address Error: " + address)
+	}
+	if listenReady != nil {
+		listenReady <- struct{}{}
 	}
 
 	defer func(l *net.Listener) {
