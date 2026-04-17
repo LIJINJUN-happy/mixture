@@ -33,8 +33,7 @@ const ConnReadTimeout = 900 * time.Second  //读取用户超时间隔（为了�
 const IntervalLoopingTime = 30 * time.Second
 const GoroutineSyncBreakSign = "_CLOSE"
 
-// CutIndexList 替代 container/list，存放每次 DoSplit 切出的包尾下标
-// 声明在调用方栈上，零堆分配，零 GC 压力
+// 声明在调用方栈上，零堆分配，零 GC 压力（替代 container/list，存放每次 DoSplit 切出的包尾下标）
 type CutIndexList struct {
 	data [MaxPacketsPerRead]int
 	len  int
