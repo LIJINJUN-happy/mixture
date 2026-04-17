@@ -83,7 +83,7 @@ func DoInit(db *sql.DB) error {
 	}
 	checkPortRes, port := database.GetGatePortNumById(GateInfo.gateId, db)
 	if !checkPortRes {
-		return fmt.Errorf("doInit", "GetGatePortNumById Failed, GateId=%v", GateInfo.gateId)
+		return fmt.Errorf("GetGatePortNumById Failed, GateId=%v", GateInfo.gateId)
 	} else {
 		GateInfo.port = strconv.Itoa(port)
 	}
