@@ -94,12 +94,18 @@ func DoSplitBySign(j *ReadStreamBufferObject, byteSlice []byte, readNum int, lis
 		//没找到就直接追加上去然后break
 		if index == -1 {
 			j.byteData = append(j.byteData, byteSlice...)
+			if uint16(len(j.byteData)) > MaxPacketBodySize {
+				printer.TextWarn("DoSplitBySign", "Oversized packet accumulated", len(j.byteData), "limit", MaxPacketBodySize)
+				j.byteData = j.byteData[0:0]
+			}
 			break
 		} else {
 			//在字符串中有切割符号
 			j.byteData = append(j.byteData, byteSlice[:index]...)
 			lenData := len(j.byteData)
-			if lenData > 0 {
+			if uint16(lenData) > MaxPacketBodySize {
+				printer.TextWarn("DoSplitBySign", "Oversized packet accumulated", len(j.byteData), "limit", MaxPacketBodySize)
+			} else if lenData > 0 {
 				//printer.TextDebug("doSplitBySign","The String", j.byteData)
 				retNum := copy(sliceBuffer[beginIdx:], j.byteData[0:])
 				beginIdx += retNum
