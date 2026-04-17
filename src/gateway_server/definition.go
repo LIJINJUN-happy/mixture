@@ -58,6 +58,30 @@ var upgrade = websocket.Upgrader{
 
 	//该函数用于拦截或放行跨域请求。函数返回值为bool类型，即true放行，false拦截。如果请求不是跨域请求可以不赋值
 	CheckOrigin: func(r *http.Request) bool {
+		/*origin := r.Header.Get("Origin")
+		if origin == "" {
+			// 浏览器前端为主的业务，建议拒绝空 Origin
+			return false
+		}
+
+		u, err := url.Parse(origin)
+		if err != nil {
+			return false
+		}
+
+		// 方案1：固定白名单
+		allowedHosts := map[string]struct{}{
+			"app.example.com":   {},
+			"admin.example.com": {},
+		}
+		if _, ok := allowedHosts[strings.ToLower(u.Hostname())]; !ok {
+			return false
+		}
+
+		// 可选：限制协议
+		if u.Scheme != "https" {
+			return false
+		}*/
 		return true // 允许所有源，生产环境中应根据需要设置更严格的CORS策略
 	},
 }
