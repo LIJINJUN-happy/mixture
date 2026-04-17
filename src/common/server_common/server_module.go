@@ -132,12 +132,12 @@ func (mod *ServerModule) LoadMod(wg *sync.WaitGroup) {
 // 处理协议数据包（来源：进程或者客户端）
 func (mod *ServerModule) HandleProtoPack(protoPack *ProtoPackInfo) {
 	defer func() {
-		// 协议数据包放回对象池，减少每次都new新包的开销
-		ProtoPackInfoPool.Put(protoPack)
-
 		if err := recover(); err != nil {
 			printer.TextError("HandleProtoPack", "ServerName", ServicePrt.ServerName, "ServerId", ServicePrt.ServerId, "modName", mod.modName, "Error", err)
 		}
+
+		// 协议数据包放回对象池，减少每次都new新包的开销
+		ProtoPackInfoPool.Put(protoPack)
 	}()
 	if callFunc, res := mod.HandleFuncMap[protoPack.ProName]; res {
 		callFunc(protoPack.Data, protoPack.GateId, protoPack.SessionID)
@@ -149,14 +149,14 @@ func (mod *ServerModule) HandleProtoPack(protoPack *ProtoPackInfo) {
 // 处理接口数据包（来源：同进程下不同模块）
 func (mod *ServerModule) HandleModulePack(modulePack *ModulePackInfo) {
 	defer func() {
+		if err := recover(); err != nil {
+			printer.TextError("HandleModulePack", "ServerName", ServicePrt.ServerName, "ServerId", ServicePrt.ServerId, "modName", mod.modName, "Error", err)
+		}
+
 		// 清理引用后再放入池中，防止内存泄漏
 		modulePack.ArgsList = nil
 		modulePack.ReturnChan = nil
 		ModulePackInfoPool.Put(modulePack)
-
-		if err := recover(); err != nil {
-			printer.TextError("HandleModulePack", "ServerName", ServicePrt.ServerName, "ServerId", ServicePrt.ServerId, "modName", mod.modName, "Error", err)
-		}
 	}()
 
 	//函数参数检测（调用者必须是函数对象）
