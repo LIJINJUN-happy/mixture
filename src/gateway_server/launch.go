@@ -71,7 +71,7 @@ func DoInit(db *sql.DB) error {
 	printer.TextInfo("doInit", "WhiteList Init Map Info", WhiteListPtr.whiteMap, "Active", WhiteListPtr.IsActive)
 
 	GateInfo.sessionIdDistributionRecord.Store(0)
-	GateInfo.rebuildListenSec = 5
+	GateInfo.rebuildListenSec = 3
 	GateInfo.rebuildListenTimes.Store(0)
 	GateInfo.maxConnSize = MaxConnectClientNum
 	GateInfo.gateId, _ = strconv.Atoi(os.Args[2])
@@ -134,9 +134,9 @@ func BeginLinkServer(sl *SerLinker) {
 					printer.TextError(s.linkerName, " dial.Close() Failed With Defer", closeErr)
 				}
 			}
-			time.Sleep(10 * time.Second)
 			go BeginLinkServer(s)
 		}(serLinker)
+		time.Sleep(GateInfo.rebuildListenSec * time.Second)
 
 	connTryAgain:
 		dial, err := net.Dial("tcp", serLinker.address)
