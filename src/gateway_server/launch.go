@@ -224,9 +224,9 @@ func DealWithLinkerData(linker *SerLinker) {
 			if num > 0 {
 				if _, writeErr := (*linker.serConn).Write(dataSlice[0:num]); writeErr != nil {
 					printer.TextError("GateWay DialObject Write Fail", "writeErr", writeErr)
-				} else {
+				} /*else {
 					printer.TextDebug("GateWay DialObject Write Success", "writeNum", num, "dataSlice", string(dataSlice[0:num]))
-				}
+				}*/
 			}
 			// 恢复容量后归还池，原始指针直接 Put，零逃逸
 			*bufPtr = (*bufPtr)[:cap(*bufPtr)]
