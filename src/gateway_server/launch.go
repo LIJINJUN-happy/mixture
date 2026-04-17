@@ -286,6 +286,11 @@ func Looping() {
 			}
 		case <-loopTimer.C:
 			printer.TextInfo("ClientGoroutine Statistics", "Read-Goroutine", clientReadGoroutineNum.Load(), "Write-Goroutine", clientWriteGoroutineNum.Load())
+			printer.TextInfo("Channel Stats",
+				"ActorSer", len(ActorSerLinker.receiveChannel),
+				"InteractiveSer", len(InteractiveSerLinker.receiveChannel),
+				"ModularizedSer", len(ModularizedSerLinker.receiveChannel),
+				"WebSer", len(WebSerLinker.receiveChannel))
 			loopTimer.Stop()
 			loopTimer.Reset(IntervalLoopingTime)
 		}
