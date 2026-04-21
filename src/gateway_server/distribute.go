@@ -289,7 +289,7 @@ func SendMsg2Server(sessionId uint32, protoName string, data []byte) {
 		return
 	}
 	// sliceBuffer 格式：[ProtoNum(2B)][Data]，SessionID 由 DoDistribute 追加
-	if bufPtr, ok := DistributeDataPool.Get().(*[]byte); !ok {
+	if bufPtr, ok := DistributeDataPool.Get().(*[]byte); ok {
 		dataLen := ProtoNumLen + len(data)
 		newData := (*bufPtr)[:dataLen]
 		binary.BigEndian.PutUint16(newData[0:], p)
