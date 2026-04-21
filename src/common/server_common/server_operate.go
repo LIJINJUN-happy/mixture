@@ -46,6 +46,14 @@ var DeliveryMsgBufPool = sync.Pool{
 	},
 }
 
+// ReceivePacketBufPool 用于 BeginService→Dispose 跨协程传递切割好的数据包，避免每包 make 分配
+var ReceivePacketBufPool = sync.Pool{
+	New: func() interface{} {
+		buf := make([]byte, gateway_server.ReadStreamBufferSize)
+		return &buf
+	},
+}
+
 func (s *ServerInfo) InitInfo(serName string, id int) bool {
 	db, isOk := database.GetSQLiteConnDB()
 	if isOk != nil {
@@ -246,12 +254,16 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 		gateway_server.DoSplit(readObj, readBuff[0:], num, &cutList, sliceBuffer)
 		for i := 0; i < cutList.Len(); i++ {
 			elementIDX := cutList.Get(i)
-			newByte := make([]byte, elementIDX-idx)
-			copyRes := copy(newByte, sliceBuffer[idx:elementIDX])
-			//printer.TextInfo("gateway_server DoSplit ", "CopyResNum", copyRes)
-			if copyRes > 0 {
+			if packetLen := elementIDX - idx; packetLen > 0 {
+				bufPtr, ok := ReceivePacketBufPool.Get().(*[]byte)
+				if !ok {
+					printer.TextError("BeginService", "Err", "ReceivePacketBufPool Get Fail")
+					return
+				}
+				*bufPtr = (*bufPtr)[:packetLen]
+				copy(*bufPtr, sliceBuffer[idx:elementIDX])
 				select {
-				case sCoon.receiveChannel <- newByte:
+				case sCoon.receiveChannel <- bufPtr:
 				default:
 					return
 				}
@@ -319,12 +331,7 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
 			if !ok || receiveData == nil {
 				return
 			}
-			dataSlice, conversionResult := receiveData.([]byte)
-			if !conversionResult {
-				//feedback := fmt.Sprintf("Ser:%v-%v, dispose receiveData conversion []byte Fail:%v", sInfo.ServerName, sInfo.ServerId, receiveData)
-				//printer.PanicStack(feedback)
-				break
-			}
+			dataSlice := *receiveData
 			sessionId := binary.BigEndian.Uint32(dataSlice)
 			protoNum := binary.BigEndian.Uint16(dataSlice[gateway_server.SessionIdLen:])
 			//printer.TextInfo("dispose receiveData", "receiveData := <-sCoon.receiveChannel", dataSlice, "sessionId", sessionId)
@@ -368,6 +375,8 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
 					printer.TextError("Dispose SYN GateId", "From GateLinker", linkerName, "Already Exist GateID", gateID)
 				}
 			}
+			*receiveData = (*receiveData)[:cap(*receiveData)]
+			ReceivePacketBufPool.Put(receiveData)
 		}
 	}
 }

@@ -12,7 +12,7 @@ type SerConnObj struct {
 	gateAddr       string      //连接过来的网关的IP地址
 	gateSerConn    *net.Conn   //和gateway_ser连接的connection
 	sendChannel    chan *[]byte //发送数据的通信道(由transmit协程发数据回GateWay)
-	receiveChannel chan any     //接收数据的通信道（接收后存入该管道,由dispose协程处理）
+	receiveChannel chan *[]byte //接收数据的通信道（接收后存入该管道,由dispose协程处理）
 	closeOnce      sync.Once   //保证Close只执行一次，防止多协程并发调用产生data race
 }
 
@@ -24,7 +24,7 @@ func (s *SerConnObj) Init(conn *net.Conn) (bool, string) {
 	s.gateSerConn = conn
 	s.gateAddr = (*conn).RemoteAddr().String()
 	s.sendChannel = make(chan *[]byte, sendChannelSize)
-	s.receiveChannel = make(chan any, receiveChannelSize)
+	s.receiveChannel = make(chan *[]byte, receiveChannelSize)
 	return true, ""
 }
 
@@ -40,7 +40,7 @@ func (s *SerConnObj) GetSendChannel() chan *[]byte {
 	return s.sendChannel
 }
 
-func (s *SerConnObj) GetReceiveChannel() chan any {
+func (s *SerConnObj) GetReceiveChannel() chan *[]byte {
 	return s.receiveChannel
 }
 
