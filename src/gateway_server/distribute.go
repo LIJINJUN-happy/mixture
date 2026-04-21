@@ -289,13 +289,20 @@ func SendMsg2Server(sessionId uint32, protoName string, data []byte) {
 		return
 	}
 	// sliceBuffer 格式：[ProtoNum(2B)][Data]，SessionID 由 DoDistribute 追加
-	newData := make([]byte, ProtoNumLen+len(data))
-	binary.BigEndian.PutUint16(newData[0:], p)
-	copy(newData[ProtoNumLen:], data)
-	printer.TextInfo("SendMsg2Server", "protoName", protoName, "data", data, "pnum", p, "newData", newData)
+	if bufPtr, ok := DistributeDataPool.Get().(*[]byte); !ok {
+		dataLen := ProtoNumLen + len(data)
+		newData := (*bufPtr)[:dataLen]
+		binary.BigEndian.PutUint16(newData[0:], p)
+		copy(newData[ProtoNumLen:], data)
+		printer.TextInfo("SendMsg2Server", "protoName", protoName, "data", data, "pnum", p, "newData", newData)
 
-	//调用派发协议接口送出协议
-	var cutList CutIndexList
-	cutList.Push(ProtoNumLen + len(data))
-	DoDistribute(&cutList, newData, sessionId)
+		//调用派发协议接口送出协议
+		var cutList CutIndexList
+		cutList.Push(dataLen)
+		*bufPtr = newData
+		DoDistribute(&cutList, *bufPtr, sessionId)
+		DistributeDataPool.Put(bufPtr)
+		return
+	}
+	printer.TextError("SendMsg2Server", "Err", "DistributeDataPool Get Fail", "sessionId", sessionId)
 }
