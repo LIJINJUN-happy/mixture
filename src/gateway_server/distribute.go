@@ -65,14 +65,8 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 			DistributeDataPool.Put(bufPtr)
 			continue
 		}
-		protoName := ProtocolDistributeInfo.ProtoNumMap[elementProtoNum]
-		protoSendSerName, canFindProtoSendSerName := ProtocolDistributeInfo.ProtoDistributeMap[protoName]
-		if !canFindProtoSendSerName {
-			printer.TextWarn("DoDistribute", "protoSendSerName is nil, protoName", protoName)
-			DistributeDataPool.Put(bufPtr)
-			continue
-		}
-		//printer.TextInfo("doDistribute", "protoName: ", protoName, "protoSendSerName: ", protoSendSerName)
+		protoSendSerName := ProtocolDistributeInfo.ProtoDistributeMap[elementProtoNum]
+		printer.TextDebug("DoDistribute", "elementProtoNum", elementProtoNum, "protoSendSerName", protoSendSerName)
 
 		// 缩切到实际数据长度，接收端 *bufPtr 即为有效数据
 		*bufPtr = data
@@ -101,6 +95,7 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 					DistributeDataPool.Put(bufPtr)
 				}
 			} else if sendTarSessionID == 0 {
+				protoName := ProtocolDistributeInfo.ProtoNumMap[elementProtoNum]
 				printer.TextWarn("DoDistribute Check serFunc", "protoName", protoName)
 				switch protoName {
 				case "xxxx":
@@ -112,14 +107,16 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 				DistributeDataPool.Put(bufPtr)
 			}
 		default:
+			printer.TextWarn("DoDistribute", "unknown protoSendSerName", protoSendSerName, "elementProtoNum", elementProtoNum)
+			DistributeDataPool.Put(bufPtr)
 		}
 	}
 }
 
 type DistributeInfo struct {
-	ProtoNumMap        [math.MaxUint16]string //协议号对应协议名字（uint16 直接索引，空字符串表示未注册）
 	ProtoNameMap       map[string]uint16      //协议名字对应协议号
-	ProtoDistributeMap map[string]string      //协议名对应转发的服务名
+	ProtoNumMap        [math.MaxUint16]string //协议号对应协议名字
+	ProtoDistributeMap [math.MaxUint16]string //协议号对应转发的服务名
 	ProtocolType       string                 //协议类型（JSON还是PB）
 	ProtoVersion       string                 //协议版本号
 }
@@ -142,7 +139,6 @@ var ProtocolDistributeInfo = new(DistributeInfo)
 // 在init先把协议内容先加载好
 func init() {
 	ProtocolDistributeInfo.ProtoNameMap = make(map[string]uint16)
-	ProtocolDistributeInfo.ProtoDistributeMap = make(map[string]string)
 	ProtocolDistributeInfo.ProtocolType = tools.GetSysValueByKey("protocolType")
 
 	//根据协议类型加载不同的allproto文件的协议号
@@ -246,7 +242,7 @@ func LoadProtocol(path string, allProto map[string]interface{}) {
 			for idx := 0; idx < lenOfValue; idx++ {
 				proName := v.Field(k).Interface().([]string)[idx]
 				ptoNum := protoStartNum
-				ProtocolDistributeInfo.ProtoDistributeMap[proName] = sendServerTarget
+				ProtocolDistributeInfo.ProtoDistributeMap[ptoNum] = sendServerTarget
 				ProtocolDistributeInfo.ProtoNumMap[ptoNum] = proName
 				ProtocolDistributeInfo.ProtoNameMap[proName] = ptoNum
 				protoStartNum += 1 //自增1
@@ -261,7 +257,7 @@ func LoadProtocol(path string, allProto map[string]interface{}) {
 					panic("mutual_pb read numStr Fail, proName = " + proName)
 				} else {
 					ptoNum := uint16(num.(float64))
-					ProtocolDistributeInfo.ProtoDistributeMap[proName] = sendServerTarget
+					ProtocolDistributeInfo.ProtoDistributeMap[ptoNum] = sendServerTarget
 					ProtocolDistributeInfo.ProtoNumMap[ptoNum] = proName
 					ProtocolDistributeInfo.ProtoNameMap[proName] = ptoNum
 					//fmt.Println("sendServerTarget = ", sendServerTarget, "proName = ", proName, "ptoNum = ", ptoNum)
@@ -278,8 +274,13 @@ func CheckLoadProtocol() {
 			sizeNum++
 		}
 	}
+	sizeDistribute := 0
+	for _, v := range ProtocolDistributeInfo.ProtoDistributeMap {
+		if v != "" {
+			sizeDistribute++
+		}
+	}
 	sizeName := len(ProtocolDistributeInfo.ProtoNameMap)
-	sizeDistribute := len(ProtocolDistributeInfo.ProtoDistributeMap)
 	if (sizeNum == sizeName) && (sizeName == sizeDistribute) {
 		return
 	}
