@@ -3,6 +3,7 @@ package gateway_server
 import (
 	"encoding/binary"
 	"encoding/json"
+	"math"
 	"mixture/src/common/printer"
 	"mixture/src/common/tools"
 	"os"
@@ -59,12 +60,12 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 
 		//根据协议号来进行协议派发（包体中从4字节开始到6字节区间的数据，大端方式读取）
 		elementProtoNum := binary.BigEndian.Uint16(data[SessionIdLen : SessionIdLen+ProtoNumLen])
-		protoName, canFindProtoName := ProtocolDistributeInfo.ProtoNumMap[elementProtoNum]
-		if !canFindProtoName {
-			printer.TextWarn("DoDistribute", "protoName is nil, elementProtoNum", elementProtoNum)
+		if int(elementProtoNum) >= math.MaxUint16 {
+			printer.TextWarn("DoDistribute", "elementProtoNum out of range", elementProtoNum, "sourceSession", sourceSession)
 			DistributeDataPool.Put(bufPtr)
 			continue
 		}
+		protoName := ProtocolDistributeInfo.ProtoNumMap[elementProtoNum]
 		protoSendSerName, canFindProtoSendSerName := ProtocolDistributeInfo.ProtoDistributeMap[protoName]
 		if !canFindProtoSendSerName {
 			printer.TextWarn("DoDistribute", "protoSendSerName is nil, protoName", protoName)
@@ -116,11 +117,11 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 }
 
 type DistributeInfo struct {
-	ProtoNumMap        map[uint16]string //协议号对应协议名字
-	ProtoNameMap       map[string]uint16 //协议名字对应协议号
-	ProtoDistributeMap map[string]string //协议名对应转发的服务名
-	ProtocolType       string            //协议类型（JSON还是PB）
-	ProtoVersion       string            //协议版本号
+	ProtoNumMap        [math.MaxUint16]string //协议号对应协议名字（uint16 直接索引，空字符串表示未注册）
+	ProtoNameMap       map[string]uint16      //协议名字对应协议号
+	ProtoDistributeMap map[string]string      //协议名对应转发的服务名
+	ProtocolType       string                 //协议类型（JSON还是PB）
+	ProtoVersion       string                 //协议版本号
 }
 
 type distributeConfigInfo struct {
@@ -140,7 +141,6 @@ var ProtocolDistributeInfo = new(DistributeInfo)
 
 // 在init先把协议内容先加载好
 func init() {
-	ProtocolDistributeInfo.ProtoNumMap = make(map[uint16]string)
 	ProtocolDistributeInfo.ProtoNameMap = make(map[string]uint16)
 	ProtocolDistributeInfo.ProtoDistributeMap = make(map[string]string)
 	ProtocolDistributeInfo.ProtocolType = tools.GetSysValueByKey("protocolType")
@@ -272,9 +272,14 @@ func LoadProtocol(path string, allProto map[string]interface{}) {
 }
 
 func CheckLoadProtocol() {
-	sizeNum := uint16(len(ProtocolDistributeInfo.ProtoNumMap))
-	sizeName := uint16(len(ProtocolDistributeInfo.ProtoNameMap))
-	sizeDistribute := uint16(len(ProtocolDistributeInfo.ProtoDistributeMap))
+	sizeNum := 0
+	for _, v := range ProtocolDistributeInfo.ProtoNumMap {
+		if v != "" {
+			sizeNum++
+		}
+	}
+	sizeName := len(ProtocolDistributeInfo.ProtoNameMap)
+	sizeDistribute := len(ProtocolDistributeInfo.ProtoDistributeMap)
 	if (sizeNum == sizeName) && (sizeName == sizeDistribute) {
 		return
 	}
