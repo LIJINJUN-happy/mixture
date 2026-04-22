@@ -186,7 +186,7 @@ func robotRecPBMsg(r *TestRobot, newConn *net.Conn) {
 
 func robDealPBMsg(r *TestRobot, data []byte, needReadSize, curDataSize, num int) {
 	proNum := binary.BigEndian.Uint16(data[0:gateway_server.ProtoNumLen])
-	proString := gateway_server.ProtocolDistributeInfo.ProtoNumMap[proNum]
+	proString := gateway_server.ProtocolDistributeInfo.ProtoNumArray[proNum]
 	resSearch := proString != ""
 	r.lastReadMsgTime = time.Now()
 	diffWithSendTime := r.lastReadMsgTime.Sub(r.lastSendMsgTime).Milliseconds()

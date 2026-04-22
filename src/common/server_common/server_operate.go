@@ -337,7 +337,7 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
 			//printer.TextInfo("dispose receiveData", "receiveData := <-sCoon.receiveChannel", dataSlice, "sessionId", sessionId)
 			if (protoNum > 0) && (sCoon.gateId > 0) {
 				//已经标识了对应的网关并识别到对应的协议号后，直接调用协议处理函数
-				protoName := gateway_server.ProtocolDistributeInfo.ProtoNumMap[protoNum]
+				protoName := gateway_server.ProtocolDistributeInfo.ProtoNumArray[protoNum]
 				fun(dataSlice[dataIdxFrom:], protoName, sCoon.gateId, sessionId)
 			} else if (protoNum == 0) && (sCoon.gateId < 0) {
 				gateID := -1

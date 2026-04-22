@@ -29,6 +29,30 @@ func SafeSendToLinker(linker *SerLinker, bufPtr *[]byte) {
 	}
 }
 
+// data 需要首 4 字节为目标客户端 SessionID（大端 uint32），把 bufPtr 派发到目标客户端的写协程缓冲；任何失败路径内部 Put 归还池
+func SafeSendToGateClient(bufPtr *[]byte, data []byte, protoNum uint16) {
+	sendTarSessionID := binary.BigEndian.Uint32(data[:SessionIdLen])
+	if client, ok := GateClientMap.Load(sendTarSessionID); ok {
+		if session, isSession := client.(*clientSession); isSession {
+			select {
+			case session.clientBuffChannel <- bufPtr:
+				return // 成功投递，bufPtr 由接收方回收
+			default:
+				printer.TextWarn("DoDistribute", "Client Buffer Full, Drop Msg SessionID", sendTarSessionID)
+			}
+		}
+	} else if sendTarSessionID == 0 {
+		protoName := ProtocolDistributeInfo.ProtoNumArray[protoNum]
+		printer.TextDebug("DoDistribute Check serFunc", "protoName", protoName)
+		switch protoName {
+		case "xxxx":
+		case "xxxxx":
+		default:
+		}
+	}
+	DistributeDataPool.Put(bufPtr)
+}
+
 // 协议格式：[[sessionID(4字节)][proNum(2字节)][data(xxx字节)]]
 // 该函数负责数据的判断与转发(sourceSession 用于区别是来自服务器内部还是客户端,假如来自客户端需要添加上相关的字段内容再做转发)
 func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint32) {
@@ -65,7 +89,7 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 			DistributeDataPool.Put(bufPtr)
 			continue
 		}
-		protoSendSerName := ProtocolDistributeInfo.ProtoDistributeMap[elementProtoNum]
+		protoSendSerName := ProtocolDistributeInfo.ProtoDistributeArray[elementProtoNum]
 		printer.TextDebug("DoDistribute", "elementProtoNum", elementProtoNum, "protoSendSerName", protoSendSerName)
 
 		// 缩切到实际数据长度，接收端 *bufPtr 即为有效数据
@@ -82,30 +106,7 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 		case "web_server":
 			SafeSendToLinker(WebSerLinker, bufPtr)
 		case "gateway_server":
-			sendTarSessionID := binary.BigEndian.Uint32(data[:SessionIdLen]) //根据sendTarSessionID转发到对应客户端Write协程读取的chan中
-			if client, resSearchFromMap := GateClientMap.Load(sendTarSessionID); resSearchFromMap {
-				if session, changeTypeRes := client.(*clientSession); changeTypeRes {
-					select {
-					case session.clientBuffChannel <- bufPtr:
-					default:
-						printer.TextWarn("DoDistribute", "Client Buffer Full, Drop Msg SessionID", sendTarSessionID) //缓冲区满了
-						DistributeDataPool.Put(bufPtr)
-					}
-				} else {
-					DistributeDataPool.Put(bufPtr)
-				}
-			} else if sendTarSessionID == 0 {
-				protoName := ProtocolDistributeInfo.ProtoNumMap[elementProtoNum]
-				printer.TextWarn("DoDistribute Check serFunc", "protoName", protoName)
-				switch protoName {
-				case "xxxx":
-				case "xxxxx":
-				default:
-				}
-				DistributeDataPool.Put(bufPtr)
-			} else {
-				DistributeDataPool.Put(bufPtr)
-			}
+			SafeSendToGateClient(bufPtr, data, elementProtoNum)
 		default:
 			printer.TextWarn("DoDistribute", "unknown protoSendSerName", protoSendSerName, "elementProtoNum", elementProtoNum)
 			DistributeDataPool.Put(bufPtr)
@@ -115,8 +116,8 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 
 type DistributeInfo struct {
 	ProtoNameMap       map[string]uint16      //协议名字对应协议号
-	ProtoNumMap        [math.MaxUint16]string //协议号对应协议名字
-	ProtoDistributeMap [math.MaxUint16]string //协议号对应转发的服务名
+	ProtoNumArray        [math.MaxUint16]string //协议号对应协议名字
+	ProtoDistributeArray [math.MaxUint16]string //协议号对应转发的服务名
 	ProtocolType       string                 //协议类型（JSON还是PB）
 	ProtoVersion       string                 //协议版本号
 }
@@ -242,8 +243,8 @@ func LoadProtocol(path string, allProto map[string]interface{}) {
 			for idx := 0; idx < lenOfValue; idx++ {
 				proName := v.Field(k).Interface().([]string)[idx]
 				ptoNum := protoStartNum
-				ProtocolDistributeInfo.ProtoDistributeMap[ptoNum] = sendServerTarget
-				ProtocolDistributeInfo.ProtoNumMap[ptoNum] = proName
+				ProtocolDistributeInfo.ProtoDistributeArray[ptoNum] = sendServerTarget
+				ProtocolDistributeInfo.ProtoNumArray[ptoNum] = proName
 				ProtocolDistributeInfo.ProtoNameMap[proName] = ptoNum
 				protoStartNum += 1 //自增1
 				//fmt.Println("sendServerTarget = ", sendServerTarget, "proName = ", proName, "ptoNum = ", ptoNum)
@@ -257,8 +258,8 @@ func LoadProtocol(path string, allProto map[string]interface{}) {
 					panic("mutual_pb read numStr Fail, proName = " + proName)
 				} else {
 					ptoNum := uint16(num.(float64))
-					ProtocolDistributeInfo.ProtoDistributeMap[ptoNum] = sendServerTarget
-					ProtocolDistributeInfo.ProtoNumMap[ptoNum] = proName
+					ProtocolDistributeInfo.ProtoDistributeArray[ptoNum] = sendServerTarget
+					ProtocolDistributeInfo.ProtoNumArray[ptoNum] = proName
 					ProtocolDistributeInfo.ProtoNameMap[proName] = ptoNum
 					//fmt.Println("sendServerTarget = ", sendServerTarget, "proName = ", proName, "ptoNum = ", ptoNum)
 				}
@@ -269,13 +270,13 @@ func LoadProtocol(path string, allProto map[string]interface{}) {
 
 func CheckLoadProtocol() {
 	sizeNum := 0
-	for _, v := range ProtocolDistributeInfo.ProtoNumMap {
+	for _, v := range ProtocolDistributeInfo.ProtoNumArray {
 		if v != "" {
 			sizeNum++
 		}
 	}
 	sizeDistribute := 0
-	for _, v := range ProtocolDistributeInfo.ProtoDistributeMap {
+	for _, v := range ProtocolDistributeInfo.ProtoDistributeArray {
 		if v != "" {
 			sizeDistribute++
 		}
