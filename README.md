@@ -243,11 +243,12 @@ DoDistribute(cutList, sliceBuffer, sourceSession)
        DistributeDataPool.Get() → bufPtr
        填充 [SessionID][ProtoNum][Data]
        *bufPtr = data                        // 缩切到实际长度
-       ProtoNumMap[protoNum] → protoName
-       ProtoDistributeMap[protoName] → 目标服务
+       越界检查: protoNum >= math.MaxUint16 → 归还池 + continue
+       ProtoDistributeMap[protoNum] → 目标服务名   // 数组直接索引，O(1)
        switch 目标服务:
          actor/interactive/modularized/web  → SafeSendToLinker(linker, bufPtr)
          gateway_server                     → GateClientMap[sessionID].clientBuffChannel ← bufPtr
+         default (未命中/未注册)            → 归还池
 ```
 
 `SafeSendToLinker` 使用非阻塞 `select/default`，channel 满时直接回收缓冲，不阻塞路由协程。
@@ -358,13 +359,15 @@ server_common.AsynchronousPack2Module("user", "UpdateScore", args)
 
 ```go
 type DistributeInfo struct {
-    ProtoNumMap        map[uint16]string // 协议号 → 协议名
-    ProtoNameMap       map[string]uint16 // 协议名 → 协议号
-    ProtoDistributeMap map[string]string // 协议名 → 目标服务名
-    ProtocolType       string            // "json" 或 "protobuf"
-    ProtoVersion       string            // 版本号
+    ProtoNameMap       map[string]uint16      // 协议名 → 协议号
+    ProtoNumMap        [math.MaxUint16]string // 协议号 → 协议名（uint16 直接索引，空串表示未注册）
+    ProtoDistributeMap [math.MaxUint16]string // 协议号 → 目标服务名（uint16 直接索引，空串表示未注册）
+    ProtocolType       string                 // "json" 或 "protobuf"
+    ProtoVersion       string                 // 版本号
 }
 ```
+
+> ProtoNumMap / ProtoDistributeMap 以协议号为下标改用定长数组存储，热路径查找由 map hash 替换为数组索引（~10ns → ~0.5ns），字符串 hash 成本省去。内存代价：约 2×1MB 的静态数组（65535 × 16B string header），进程启动时一次性分配。
 
 ### 协议加载规则
 
