@@ -294,7 +294,7 @@ func SendMsg2Server(sessionId uint32, protoName string, data []byte) {
 		newData := (*bufPtr)[:dataLen]
 		binary.BigEndian.PutUint16(newData[0:], p)
 		copy(newData[ProtoNumLen:], data)
-		printer.TextInfo("SendMsg2Server", "protoName", protoName, "data", data, "pnum", p, "newData", newData)
+		//printer.TextDebug("SendMsg2Server", "protoName", protoName, "data", data, "pnum", p, "newData", newData)
 
 		//调用派发协议接口送出协议
 		var cutList CutIndexList
