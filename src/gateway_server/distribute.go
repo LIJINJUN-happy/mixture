@@ -20,6 +20,7 @@ var DistributeDataPool = sync.Pool{
 	},
 }
 
+// 把 bufPtr 派发到目标服务进程（linker）的接收通道，任何失败路径内部 Put 归还池
 func SafeSendToLinker(linker *SerLinker, bufPtr *[]byte) {
 	select {
 	case linker.receiveChannel <- bufPtr:
@@ -29,9 +30,8 @@ func SafeSendToLinker(linker *SerLinker, bufPtr *[]byte) {
 	}
 }
 
-// data 需要首 4 字节为目标客户端 SessionID（大端 uint32），把 bufPtr 派发到目标客户端的写协程缓冲；任何失败路径内部 Put 归还池
-func SafeSendToGateClient(bufPtr *[]byte, data []byte, protoNum uint16) {
-	sendTarSessionID := binary.BigEndian.Uint32(data[:SessionIdLen])
+// 把 bufPtr 派发到目标客户端（sendTarSessionID）的写协程缓冲，任何失败路径内部 Put 归还池
+func SafeSendToGateClient(bufPtr *[]byte, sendTarSessionID uint32, protoNum uint16) {
 	if client, ok := GateClientMap.Load(sendTarSessionID); ok {
 		if session, isSession := client.(*clientSession); isSession {
 			select {
@@ -106,20 +106,21 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 		case "web_server":
 			SafeSendToLinker(WebSerLinker, bufPtr)
 		case "gateway_server":
-			SafeSendToGateClient(bufPtr, data, elementProtoNum)
+			sendTarSessionID := binary.BigEndian.Uint32(data[:SessionIdLen])
+			SafeSendToGateClient(bufPtr, sendTarSessionID, elementProtoNum)
 		default:
-			printer.TextWarn("DoDistribute", "unknown protoSendSerName", protoSendSerName, "elementProtoNum", elementProtoNum)
 			DistributeDataPool.Put(bufPtr)
+			printer.TextWarn("DoDistribute", "unknown protoSendSerName", protoSendSerName, "elementProtoNum", elementProtoNum)
 		}
 	}
 }
 
 type DistributeInfo struct {
-	ProtoNameMap       map[string]uint16      //协议名字对应协议号
+	ProtoNameMap         map[string]uint16      //协议名字对应协议号
 	ProtoNumArray        [math.MaxUint16]string //协议号对应协议名字
 	ProtoDistributeArray [math.MaxUint16]string //协议号对应转发的服务名
-	ProtocolType       string                 //协议类型（JSON还是PB）
-	ProtoVersion       string                 //协议版本号
+	ProtocolType         string                 //协议类型（JSON还是PB）
+	ProtoVersion         string                 //协议版本号
 }
 
 type distributeConfigInfo struct {
