@@ -30,18 +30,18 @@ func SafeSendToLinker(linker *SerLinker, bufPtr *[]byte) {
 	}
 }
 
-// 把 bufPtr 派发到目标客户端（sendTarSessionID）的写协程缓冲，任何失败路径内部 Put 归还池
-func SafeSendToGateClient(bufPtr *[]byte, sendTarSessionID uint32, protoNum uint16) {
-	if client, ok := GateClientMap.Load(sendTarSessionID); ok {
+// 把 bufPtr 派发到目标客户端（sessionID）的写协程缓冲，任何失败路径内部 Put 归还池
+func SafeSendToGateClient(bufPtr *[]byte, sessionID uint32, protoNum uint16) {
+	if client, ok := GateClientMap.Load(sessionID); ok {
 		if session, isSession := client.(*clientSession); isSession {
 			select {
 			case session.clientBuffChannel <- bufPtr:
 				return // 成功投递，bufPtr 由接收方回收
 			default:
-				printer.TextWarn("DoDistribute", "Client Buffer Full, Drop Msg SessionID", sendTarSessionID)
+				printer.TextWarn("DoDistribute", "Client Buffer Full, Drop Msg SessionID", sessionID)
 			}
 		}
-	} else if sendTarSessionID == 0 {
+	} else if sessionID == 0 {
 		protoName := ProtocolDistributeInfo.ProtoNumArray[protoNum]
 		printer.TextDebug("DoDistribute Check serFunc", "protoName", protoName)
 		switch protoName {
