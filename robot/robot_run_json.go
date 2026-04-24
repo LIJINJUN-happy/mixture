@@ -10,7 +10,6 @@ import (
 	"os"
 	"strconv"
 	"time"
-	"unsafe"
 )
 
 // 根据配置创建机器人
@@ -80,7 +79,7 @@ func robotSendJSMsg(r *TestRobot) {
 				break
 			}
 			binary.BigEndian.PutUint16(newData[0:], va)
-			newData = append(newData[:unsafe.Sizeof(va)], nb...)
+			newData = append(newData[:gateway_server.ProtoNumLen], nb...)
 			//fmt.Println("newData Size = ", len(newData))
 
 			//打包数据,形成数据包体待发送给服务器
@@ -113,7 +112,7 @@ func robotSendJSMsg(r *TestRobot) {
 
 // 机器人接收字节数据
 func robotRecJSMsg(r *TestRobot, newConn *net.Conn) {
-	headData := make([]byte, 2)                                   //包头数据
+	headData := make([]byte, gateway_server.HeadLen)              //包头数据
 	headSizeAlreadyRead := 0                                      //已读包头长度
 	needReadSize := 0                                             //需要读取的长度大小
 	curDataSize := 0                                              //当前包所读取的长度大小
@@ -153,7 +152,7 @@ func robotRecJSMsg(r *TestRobot, newConn *net.Conn) {
 						robDealJSMsg(r, compData[:needReadSize], diff, curDataSize, num)
 
 						//切好一个包需要重置相关数据内容，然后继续开始切下一个包
-						headData = make([]byte, 2)
+						headData = make([]byte, gateway_server.HeadLen)
 						compData = make([]byte, gateway_server.ReadStreamBufferSize)
 						headSizeAlreadyRead = 0
 						needReadSize = 0
