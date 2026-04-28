@@ -442,7 +442,7 @@ func DeliveryMsg(gateID int, sessionId uint32, protoName string, data []byte) {
 				DeliveryMsgBufPool.Put(bufPtr)
 			}
 		} else {
-			printer.TextError("copy sendDataBuf Not Same, copy result size = "+strconv.Itoa(n)+" dataLen =", strconv.Itoa(dataLen))
+			printer.TextError("copy sendDataBuf size mismatch", "copySize", n, "dataLen", dataLen)
 			DeliveryMsgBufPool.Put(bufPtr)
 		}
 	} else {

@@ -32,8 +32,10 @@ func MongoDBConnectClientInit(serName, processId string) {
 			}()
 			userAndPassWord := tools.GetSysValueByKey("mongoPassword")
 			mongoReadDBAddr, mongoReadDBPort, mongoWriteDBAddr, mongoWriteDBPort = GetMongoAddressAndPort(serName, processId, netDB)
-			readClientOptions = options.Client().ApplyURI("mongodb://" + userAndPassWord + mongoReadDBAddr + ":" + mongoReadDBPort)
-			writeClientOptions = options.Client().ApplyURI("mongodb://" + userAndPassWord + mongoWriteDBAddr + ":" + mongoWriteDBPort)
+			readURI := fmt.Sprintf("mongodb://%s%s:%s", userAndPassWord, mongoReadDBAddr, mongoReadDBPort)
+			writeURI := fmt.Sprintf("mongodb://%s%s:%s", userAndPassWord, mongoWriteDBAddr, mongoWriteDBPort)
+			readClientOptions = options.Client().ApplyURI(readURI)
+			writeClientOptions = options.Client().ApplyURI(writeURI)
 
 			//创建读写池（读写分离）
 			readMongoClient.Store(CreateMongoClient(readClientOptions))

@@ -102,10 +102,10 @@ func DoInit(db *sql.DB) error {
 	checkWorkMode := GateInfo.workMode == "tcp" || GateInfo.workMode == "ws"
 	checkProtocol := GateInfo.protocol == "json" || GateInfo.protocol == "protobuf"
 	if !checkWorkMode {
-		return errors.New("Args Error With GateWay's WorkMode: " + GateInfo.workMode + " , Should Be 'tcp' or 'ws'")
+		return fmt.Errorf("invalid workMode %q, expected tcp or ws", GateInfo.workMode)
 	}
 	if !checkProtocol {
-		return errors.New("Args Error With GateWay's Protocol: " + GateInfo.protocol + " , Should Be 'json' or 'protobuf'")
+		return fmt.Errorf("invalid protocol %q, expected json or protobuf", GateInfo.protocol)
 	}
 
 	//ActorSerLinker初始化
