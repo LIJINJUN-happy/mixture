@@ -121,11 +121,10 @@ func DoSplitBySign(j *ReadStreamBufferObject, byteSlice []byte, readNum int, lis
 			//printer.TextDebug("剩余内容： " + string(byteSlice))
 			if (readNum == 1) || (readNum == 0) {
 				break //只剩下切割符了或者没有字符串了（直接无视）
-			} else {
-				//到了这里必定是两个以上的数据长度（包含一个切割符，且切割符在第一位）
-				DoSplitBySign(j, byteSlice[1:], readNum-1, list, sliceBuffer, beginIdx)
-				return
 			}
+			//到了这里必定是两个以上的数据长度（包含一个切割符，且切割符在第一位）
+			DoSplitBySign(j, byteSlice[1:], readNum-1, list, sliceBuffer, beginIdx)
+			return
 		}
 	}
 }
@@ -151,12 +150,9 @@ func DoSplitByAppointLen(j *ReadStreamBufferObject, byteSlice []byte, readNum in
 		//读取完需要判断下还有没有可数据,有就递归继续处理
 		if readNum > 0 {
 			DoSplitByAppointLen(j, byteSlice, readNum, list, sliceBuffer, beginIdx)
-		} else {
-			return
 		}
 	} else {
 		j.byteData = append(j.byteData, byteSlice...)
 		j.curReadLen += uint16(readNum)
-		return
 	}
 }

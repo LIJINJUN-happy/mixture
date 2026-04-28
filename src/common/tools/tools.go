@@ -32,10 +32,9 @@ func GetSysValueByKey(key string) string {
 				idx := strings.Index(line, key+"=")
 				if idx == -1 {
 					return ""
-				} else {
-					idx = strings.Index(line, "=")
-					return strings.Clone(line[idx+1:])
 				}
+				idx = strings.Index(line, "=")
+				return strings.Clone(line[idx+1:])
 			}
 		}
 	}

@@ -42,13 +42,12 @@ func DoPackByAppointLen(byteList []byte, data []byte) int {
 	limitSize, byteListSize := int(appointLen), len(byteList)
 	if byteListSize > limitSize {
 		return 0
-	} else {
-		//补充空白处
-		diff := limitSize - byteListSize
-		if diff > 0 {
-			byteList = append(byteList, bytes.Repeat([]byte("\x00"), diff)...)
-			//printer.TextDebug("doPackByAppointLen", "Len byteList", len(byteList))
-		}
+	}
+	//补充空白处
+	diff := limitSize - byteListSize
+	if diff > 0 {
+		byteList = append(byteList, bytes.Repeat([]byte("\x00"), diff)...)
+		//printer.TextDebug("doPackByAppointLen", "Len byteList", len(byteList))
 	}
 	return limitSize
 }

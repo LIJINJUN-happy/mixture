@@ -174,10 +174,9 @@ func (s *ServerInfo) RegisterMonitorLogic(f func([]byte, string, int, uint32)) {
 	if err != nil {
 		printer.TextError("Listen Address Error", "ServerName", serName, "ServerId", serId, "Ip", ip, "ErrMsg", err)
 		return
-	} else {
-		s.SetDisposeFunc(f)
-		s.SetListener(&listener)
 	}
+	s.SetDisposeFunc(f)
+	s.SetListener(&listener)
 
 	defer func(l *net.Listener, name string, id int) {
 		if r := recover(); r != nil {
@@ -381,9 +380,8 @@ func (s *ServerInfo) RegisterServerHandleFunc(protocol string, handleFunc func(d
 	if _, ok := s.ServerHandleFuncMap[protocol]; ok {
 		printer.TextError("RegisterServerHandleFunc Fail", "Multiple Registration Func Name", protocol)
 		return
-	} else {
-		s.ServerHandleFuncMap[protocol] = handleFunc
 	}
+	s.ServerHandleFuncMap[protocol] = handleFunc
 }
 
 // 尝试调用进程服务响应函数方法

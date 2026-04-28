@@ -256,15 +256,15 @@ func LoadProtocol(path string, allProto map[string]interface{}) {
 			lenOfValue := v.Field(k).Len()
 			for idx := 0; idx < lenOfValue; idx++ {
 				proName := v.Field(k).Interface().([]string)[idx]
-				if num, findProtoNum := allProto[proName]; !findProtoNum {
+				num, findProtoNum := allProto[proName]
+				if !findProtoNum {
 					panic("mutual_pb read numStr Fail, proName = " + proName)
-				} else {
-					ptoNum := uint16(num.(float64))
-					ProtocolDistributeInfo.ProtoDistributeArray[ptoNum] = sendServerTarget
-					ProtocolDistributeInfo.ProtoNumArray[ptoNum] = proName
-					ProtocolDistributeInfo.ProtoNameMap[proName] = ptoNum
-					//fmt.Println("sendServerTarget = ", sendServerTarget, "proName = ", proName, "ptoNum = ", ptoNum)
 				}
+				ptoNum := uint16(num.(float64))
+				ProtocolDistributeInfo.ProtoDistributeArray[ptoNum] = sendServerTarget
+				ProtocolDistributeInfo.ProtoNumArray[ptoNum] = proName
+				ProtocolDistributeInfo.ProtoNameMap[proName] = ptoNum
+				//fmt.Println("sendServerTarget = ", sendServerTarget, "proName = ", proName, "ptoNum = ", ptoNum)
 			}
 		}
 	}

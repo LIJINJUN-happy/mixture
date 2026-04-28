@@ -181,13 +181,12 @@ func BeginLinkServer(sl *SerLinker) {
 				}
 				printer.TextError(desc)
 				return
-			} else {
-				//printer.TextInfo("Get Data ", "From ", serLinker.linkerName, "serData", serData[:readNum])
-				DoSplit(rsbObject, serData, readNum, &cutList, sliceBuffer)
-
-				//派发到对应的通信道中(来自其他服务所以sourceSessionID为0，标识不是来自客户端发送来的协议数据)
-				DoDistribute(&cutList, sliceBuffer, 0)
 			}
+			//printer.TextInfo("Get Data ", "From ", serLinker.linkerName, "serData", serData[:readNum])
+			DoSplit(rsbObject, serData, readNum, &cutList, sliceBuffer)
+
+			//派发到对应的通信道中(来自其他服务所以sourceSessionID为0，标识不是来自客户端发送来的协议数据)
+			DoDistribute(&cutList, sliceBuffer, 0)
 		}
 	}(sl)
 }
