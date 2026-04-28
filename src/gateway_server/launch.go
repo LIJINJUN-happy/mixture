@@ -140,20 +140,12 @@ func BeginLinkServer(sl *SerLinker) {
 	connTryAgain:
 		dial, err := net.Dial("tcp", serLinker.address)
 		if err != nil {
-			var strBuild strings.Builder
-			errString := err.Error()
-			strBuild.Grow(len(errString) + len(serLinker.linkerName) + 20)
-			strBuild.WriteString("Link To ")
-			strBuild.WriteString(serLinker.linkerName)
-			strBuild.WriteString(" Fail: ")
-			strBuild.WriteString(errString)
-			printer.TextError(strBuild.String())
+			printer.TextError("Link Fail", "LinkerName", serLinker.linkerName, "Error", err.Error())
 			time.Sleep(GateInfo.rebuildListenSec * time.Second)
 			goto connTryAgain //链接失败再重新尝试,不成功就不创建dealWithLinkerData协程,避免协程泄露
-		} else {
-			printer.TextInfo("Link Success", "LinkerName", serLinker.linkerName)
-			serLinker.serConn = &dial
 		}
+		printer.TextInfo("Link Success", "LinkerName", serLinker.linkerName)
+		serLinker.serConn = &dial
 
 		go DealWithLinkerData(serLinker)
 
