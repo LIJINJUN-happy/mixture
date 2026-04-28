@@ -204,12 +204,11 @@ func (s *ServerInfo) RegisterMonitorLogic(f func([]byte, string, int, uint32)) {
 
 		//创建连接对象（网关连接过来成功后创建的对象）,并且加入连接列表里
 		SerConnObjPtr := new(SerConnObj)
-		if res, desc := SerConnObjPtr.Init(&newConn); !res {
-			printer.TextError("Init New Conn Error", desc, "ServerName", serName, "ServerId", serId)
+		if initErr := SerConnObjPtr.Init(&newConn); initErr != nil {
+			printer.TextError("Init New Conn Error", "err", initErr.Error(), "ServerName", serName, "ServerId", serId)
 			continue
-		} else {
-			go s.BeginService(SerConnObjPtr)
 		}
+		go s.BeginService(SerConnObjPtr)
 	}
 }
 

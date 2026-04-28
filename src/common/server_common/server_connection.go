@@ -1,6 +1,7 @@
 package server_common
 
 import (
+	"errors"
 	"mixture/src/common/printer"
 	"net"
 	"sync"
@@ -16,16 +17,16 @@ type SerConnObj struct {
 	closeOnce      sync.Once   //保证Close只执行一次，防止多协程并发调用产生data race
 }
 
-func (s *SerConnObj) Init(conn *net.Conn) (bool, string) {
+func (s *SerConnObj) Init(conn *net.Conn) error {
 	if conn == nil {
-		return false, "conn Can't Be Nil"
+		return errors.New("SerConnObj.Init: conn is nil")
 	}
 	s.gateId = -1
 	s.gateSerConn = conn
 	s.gateAddr = (*conn).RemoteAddr().String()
 	s.sendChannel = make(chan *[]byte, sendChannelSize)
 	s.receiveChannel = make(chan *[]byte, receiveChannelSize)
-	return true, ""
+	return nil
 }
 
 func (s *SerConnObj) GetGateId() int {

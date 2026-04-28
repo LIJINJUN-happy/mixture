@@ -3,6 +3,7 @@ package database
 
 import (
 	"database/sql"
+	"fmt"
 	_ "github.com/mattn/go-sqlite3"
 	"mixture/src/common/printer"
 	"strconv"
@@ -24,36 +25,48 @@ func GetSQLiteConnDB() (*sql.DB, error) {
 	return db, nil
 }
 
-func GetGateIPAddressById(gateId int, db *sql.DB) (bool, string) {
+func GetGateIPAddressById(gateId int, db *sql.DB) (string, error) {
 	address := ""
 	err := db.QueryRow(`SELECT gatewaySerAddress FROM "gatewaySerConfig" WHERE gatewaySerId=?`, gateId).Scan(&address)
 	//printer.TextDebug("GetGateIPAddressById", "Get Address", address, " By GateID", gateId)
-	if (err == nil) && (len(address) >= 1) {
-		return true, address
+	if err != nil {
+		return "", fmt.Errorf("GetGateIPAddressById gateId=%d: %w", gateId, err)
 	}
-	return false, ""
+	if len(address) < 1 {
+		return "", fmt.Errorf("GetGateIPAddressById gateId=%d: empty address", gateId)
+	}
+	return address, nil
 }
 
-func GetGatePortNumById(gateId int, db *sql.DB) (bool, int) {
+func GetGatePortNumById(gateId int, db *sql.DB) (int, error) {
 	portString := ""
 	queryErr := db.QueryRow(`SELECT gatewaySerPort FROM "gatewaySerConfig" WHERE gatewaySerId=?`, gateId).Scan(&portString)
 	//printer.TextDebug("GetGatePortNumById", "Get Port", portString, " By GateID", gateId)
-	port, err := strconv.Atoi(portString)
-	if (queryErr == nil) && (err == nil) && (port > 0) {
-		return true, port
+	if queryErr != nil {
+		return 0, fmt.Errorf("GetGatePortNumById gateId=%d: %w", gateId, queryErr)
 	}
-	return false, 0
+	port, err := strconv.Atoi(portString)
+	if err != nil {
+		return 0, fmt.Errorf("GetGatePortNumById gateId=%d invalid port %q: %w", gateId, portString, err)
+	}
+	if port <= 0 {
+		return 0, fmt.Errorf("GetGatePortNumById gateId=%d: non-positive port %d", gateId, port)
+	}
+	return port, nil
 }
 
-func GetInteractiveSerIdByGateId(gateId int, db *sql.DB) (bool, int) {
+func GetInteractiveSerIdByGateId(gateId int, db *sql.DB) (int, error) {
 	interactiveSerId := ""
 	queryErr := db.QueryRow(`SELECT interactiveSerId FROM "gatewaySerConfig" WHERE gatewaySerId=?`, gateId).Scan(&interactiveSerId)
 	//printer.TextDebug("GetInteractiveSerIdByGateId", "Get InteractiveSerId", interactiveSerId, " By GateID", gateId)
-	sId, err := strconv.Atoi(interactiveSerId)
-	if (queryErr == nil) && (err == nil) {
-		return true, sId
+	if queryErr != nil {
+		return 0, fmt.Errorf("GetInteractiveSerIdByGateId gateId=%d: %w", gateId, queryErr)
 	}
-	return false, 0
+	sId, err := strconv.Atoi(interactiveSerId)
+	if err != nil {
+		return 0, fmt.Errorf("GetInteractiveSerIdByGateId gateId=%d invalid id %q: %w", gateId, interactiveSerId, err)
+	}
+	return sId, nil
 }
 
 func GetSerAddressById(id int, db *sql.DB, serName string) string {

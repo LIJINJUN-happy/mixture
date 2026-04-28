@@ -75,18 +75,17 @@ func DoInit(db *sql.DB) error {
 	GateInfo.rebuildListenTimes.Store(0)
 	GateInfo.maxConnSize = MaxConnectClientNum
 	GateInfo.gateId, _ = strconv.Atoi(os.Args[2])
-	checkAddressRes, address := database.GetGateIPAddressById(GateInfo.gateId, db)
-	if !checkAddressRes {
-		return fmt.Errorf("GetGateIPAddressById Failed, GateId=%v", GateInfo.gateId)
-	} else {
-		GateInfo.ip = address
+	address, errAddr := database.GetGateIPAddressById(GateInfo.gateId, db)
+	if errAddr != nil {
+		return errAddr
 	}
-	checkPortRes, port := database.GetGatePortNumById(GateInfo.gateId, db)
-	if !checkPortRes {
-		return fmt.Errorf("GetGatePortNumById Failed, GateId=%v", GateInfo.gateId)
-	} else {
-		GateInfo.port = strconv.Itoa(port)
+	GateInfo.ip = address
+
+	port, errPort := database.GetGatePortNumById(GateInfo.gateId, db)
+	if errPort != nil {
+		return errPort
 	}
+	GateInfo.port = strconv.Itoa(port)
 	workMode := tools.GetSysValueByKey("workMode")
 	GateInfo.workMode = workMode
 
@@ -94,9 +93,9 @@ func DoInit(db *sql.DB) error {
 	GateInfo.protocol = protocolType
 
 	//查找interactiveSer的ID标识
-	checkInteractiveSerIdRes, interactiveSerId := database.GetInteractiveSerIdByGateId(GateInfo.gateId, db)
-	if !checkInteractiveSerIdRes {
-		return fmt.Errorf("checkInteractiveSerIdRes=%v, GateId=%v", checkInteractiveSerIdRes, GateInfo.gateId)
+	interactiveSerId, errIsId := database.GetInteractiveSerIdByGateId(GateInfo.gateId, db)
+	if errIsId != nil {
+		return errIsId
 	}
 
 	//根据执行参数选择网络模式以及使用的协议方式

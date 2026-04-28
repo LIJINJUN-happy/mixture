@@ -2,6 +2,7 @@ package database
 
 import (
 	"errors"
+	"fmt"
 	"github.com/bradfitz/gomemcache/memcache"
 	"mixture/src/common/printer"
 	"sync/atomic"
@@ -44,54 +45,45 @@ func CreateMenCacheElement() *memcache.Client {
 }
 
 // 缓存操作调用统一接口
-func MemCacheCmd(cmd, key string, val []byte) (bool, string) {
-	errString := "Get NUll MemCache Client" //错误描述
-	m := cache.Load()                       //获取连接池对象
-
-	if m != nil {
-		//操作：
-		switch cmd {
-		case "SET":
-			res := m.Set(&memcache.Item{Key: key, Value: val, Expiration: cacheItemExpiration})
-			if res == nil {
-				return true, ""
-			}
-			errString = res.Error()
-		case "GET":
-			if item, err := m.Get(key); err == nil {
-				return true, string(item.Value)
-			} else if errors.Is(err, memcache.ErrCacheMiss) {
-				return false, "" // 未命中，空字符串标识，调用方按业务处理
-			} else {
-				errString = err.Error() // 真正的网络/连接错误
-			}
-		case "DEL":
-			res := m.Delete(key)
-			if res == nil {
-				return true, ""
-			} else {
-				errString = res.Error()
-			}
-		case "ADD":
-			res := m.Add(&memcache.Item{Key: key, Value: val, Expiration: cacheItemExpiration})
-			if res == nil {
-				return true, ""
-			} else {
-				errString = res.Error()
-			}
-		case "REP":
-			res := m.Replace(&memcache.Item{Key: key, Value: val, Expiration: cacheItemExpiration})
-			if res == nil {
-				return true, ""
-			} else {
-				errString = res.Error()
-			}
-		default:
-			errString = "Can Not Find Any Cmd = '" + cmd + "'"
-			break
-		}
+// GET：命中返回 (value, nil)；未命中返回 ("", memcache.ErrCacheMiss)；其他错误返回 ("", err)
+// SET/DEL/ADD/REP：成功返回 ("", nil)；失败返回 ("", err)
+func MemCacheCmd(cmd, key string, val []byte) (string, error) {
+	m := cache.Load() //获取连接池对象
+	if m == nil {
+		return "", errors.New("MemCacheCmd: client is nil")
 	}
-	return false, errString
+
+	switch cmd {
+	case "SET":
+		if err := m.Set(&memcache.Item{Key: key, Value: val, Expiration: cacheItemExpiration}); err != nil {
+			return "", fmt.Errorf("MemCacheCmd SET %s: %w", key, err)
+		}
+		return "", nil
+	case "GET":
+		item, err := m.Get(key)
+		if err == nil {
+			return string(item.Value), nil
+		}
+		// ErrCacheMiss 也按错误返回，调用方用 errors.Is 判断
+		return "", fmt.Errorf("MemCacheCmd GET %s: %w", key, err)
+	case "DEL":
+		if err := m.Delete(key); err != nil {
+			return "", fmt.Errorf("MemCacheCmd DEL %s: %w", key, err)
+		}
+		return "", nil
+	case "ADD":
+		if err := m.Add(&memcache.Item{Key: key, Value: val, Expiration: cacheItemExpiration}); err != nil {
+			return "", fmt.Errorf("MemCacheCmd ADD %s: %w", key, err)
+		}
+		return "", nil
+	case "REP":
+		if err := m.Replace(&memcache.Item{Key: key, Value: val, Expiration: cacheItemExpiration}); err != nil {
+			return "", fmt.Errorf("MemCacheCmd REP %s: %w", key, err)
+		}
+		return "", nil
+	default:
+		return "", fmt.Errorf("MemCacheCmd: unknown cmd %q", cmd)
+	}
 }
 
 func StartMemCacheHealthCheck(interval time.Duration) {
@@ -172,7 +164,7 @@ func MemCacheBatchSet(kvMap map[string][]byte) []string {
 // 使用场景：自动处理"先查缓存，miss再查DB"的逻辑
 func MemCacheGetOrLoad(key string, loader func() ([]byte, error)) ([]byte, error) {
 	// 先查缓存
-	if ok, val := MemCacheCmd("GET", key, nil); ok {
+	if val, err := MemCacheCmd("GET", key, nil); err == nil {
 		return []byte(val), nil
 	}
 
@@ -184,8 +176,8 @@ func MemCacheGetOrLoad(key string, loader func() ([]byte, error)) ([]byte, error
 
 	// 回写缓存（异步，不阻塞）
 	go func(k string, d []byte) {
-		if ok, errMsg := MemCacheCmd("SET", k, d); !ok {
-			printer.TextWarn("MemCacheGetOrLoad", "SetCache failed", errMsg)
+		if _, setErr := MemCacheCmd("SET", k, d); setErr != nil {
+			printer.TextWarn("MemCacheGetOrLoad", "SetCache failed", setErr.Error())
 		}
 	}(key, data)
 
