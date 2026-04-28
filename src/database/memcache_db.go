@@ -37,11 +37,11 @@ func CreateMenCacheElement() *memcache.Client {
 	localHost := cacheDBAddr + ":" + cacheDBPort
 	client := memcache.New(localHost)
 	client.Timeout = cacheTimeOut
-	if pingErr := client.Ping(); pingErr == nil {
-		return client
-	} else {
+	pingErr := client.Ping()
+	if pingErr != nil {
 		panic("MemCaChe CreateMenCacheElement Error: Ping Fail")
 	}
+	return client
 }
 
 // 缓存操作调用统一接口
@@ -183,4 +183,3 @@ func MemCacheGetOrLoad(key string, loader func() ([]byte, error)) ([]byte, error
 
 	return data, nil
 }
-
