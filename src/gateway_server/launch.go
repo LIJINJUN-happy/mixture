@@ -240,7 +240,7 @@ func BeginGateServer() {
 		printer.TextError("Rebuild ListenTimes Exceeded.")
 		os.Exit(101)
 	}
-	printer.TextInfo("Begin Launching Server gateway_server")
+	printer.TextInfo("Start Launching GatewayServer")
 	if GateInfo.workMode == "tcp" {
 		go func() {
 			defer func() {
