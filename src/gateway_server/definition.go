@@ -2,6 +2,7 @@ package gateway_server
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/gorilla/websocket"
 	"mixture/src/common/printer"
 	"mixture/src/database"
@@ -259,7 +260,8 @@ func (linker *SerLinker) InitLinker(linkerName string, db *sql.DB, linkerID int)
 	address := database.GetSerAddressById(linkerID, db, linkerName)
 	port := database.GetSerPortById(linkerID, db, linkerName)
 	if len(address) < 1 || port <= 0 {
-		panic("Error initLinker " + linkerName + ": " + strconv.Itoa(linkerID))
+		err := fmt.Errorf("error initLinker:%s,linkerID:%d", linkerName, linkerID)
+		panic(err)
 	}
 
 	linker.receiveChannel = make(chan *[]byte, channelBufferSize)
