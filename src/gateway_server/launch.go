@@ -194,7 +194,6 @@ func BeginLinkServer(sl *SerLinker) {
 				DoDistribute(&cutList, sliceBuffer, 0)
 			}
 		}
-
 	}(sl)
 }
 
