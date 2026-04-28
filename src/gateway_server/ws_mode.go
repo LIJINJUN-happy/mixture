@@ -99,7 +99,7 @@ func TestFunc(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		n, e := w.Write([]byte("here" + strconv.Itoa(time.Now().Second())))
 		if e != nil {
-			printer.TextError("Failed to write response:" + e.Error())
+			printer.TextError("Write response failed", "err", e)
 		} else {
 			printer.TextInfo("testFunc", "n", n, "r", r)
 		}

@@ -72,7 +72,7 @@ func DoWriteMsg(newConn *NewConnection) {
 		select {
 		case SynFromReadGoroutine := <-newConn.rwChannel:
 			if SynFromReadGoroutine == GoroutineSyncBreakSign {
-				printer.TextDebug("收到" + SynFromReadGoroutine)
+				printer.TextDebug("Received Signal", "msg", SynFromReadGoroutine)
 				return
 			}
 		case bufPtr := <-newConn.writeChan:
@@ -128,7 +128,7 @@ func DoReadMsg(newConn *NewConnection) {
 			} else if CheckIsReadTimeOut(readError) {
 				printer.TextInfo("Read Timeout", "RemoteAddr", (*newConn).RemoteAddr().String())
 			} else {
-				printer.TextError("Read Error: " + readError.Error())
+				printer.TextError("Read ErrorMsg", "err", readError)
 			}
 			return
 		} else {

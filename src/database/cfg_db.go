@@ -13,15 +13,15 @@ import (
 func GetSQLiteConnDB() (*sql.DB, error) {
 	db, err := sql.Open("sqlite3", "net_sql.db")
 	if err != nil {
-		printer.TextError("SqlLite Database Open Failed" + err.Error())
+		printer.TextError("SQLite open failed", "err", err)
 		return nil, err
 	}
 	version := ""
 	if err = db.QueryRow("SELECT SQLITE_VERSION();").Scan(&version); err != nil {
-		printer.TextError("Database creation failed: " + err.Error())
+		printer.TextError("Database creation failed", "err", err)
 		return nil, err
 	}
-	printer.TextDebug("SQLite Open Successful" + version)
+	printer.TextDebug("SQLite open success", "version", version)
 	return db, nil
 }
 

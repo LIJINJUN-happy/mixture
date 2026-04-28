@@ -54,14 +54,14 @@ func CreateMongoClient(opc *options.ClientOptions) *mongo.Client {
 	defer cancel()
 	client, err := mongo.Connect(ctx, opc)
 	if err != nil {
-		printer.TextError("createReadWriteMongoPool Write Connect failed: " + err.Error())
+		printer.TextError("Mongo write connect failed", "err", err)
 	}
 	if client != nil {
 		pingCtx, pingCancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer pingCancel()
 		err = client.Ping(pingCtx, readpref.Primary()) // ping一下WriteMongoDB测试下是否调通
 		if err != nil {
-			printer.TextError("createReadWriteMongoPool Write Ping failed: " + err.Error())
+			printer.TextError("Mongo write ping failed", "err", err)
 		}
 	}
 	return client
