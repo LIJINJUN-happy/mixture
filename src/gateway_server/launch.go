@@ -48,7 +48,7 @@ func DoInit(db *sql.DB) error {
 	defer func(sq *sql.DB) {
 		closeError := sq.Close() //调用db.Close() 函数关闭数据库
 		if closeError != nil {
-			printer.TextError("doInit", "SqlLite Database Close Failed", closeError)
+			printer.TextError("DoInit", "SqlLite Database Close Failed", closeError)
 		}
 	}(db)
 
@@ -68,7 +68,7 @@ func DoInit(db *sql.DB) error {
 	} else {
 		return fmt.Errorf("whiteIPListDefaultStatus Error Status %v", whiteStatus)
 	}
-	printer.TextInfo("doInit", "WhiteList Init Map Info", WhiteListPtr.whiteMap, "Active", WhiteListPtr.IsActive)
+	printer.TextInfo("DoInit", "WhiteList Init Map Info", WhiteListPtr.whiteMap, "Active", WhiteListPtr.IsActive)
 
 	GateInfo.sessionIdDistributionRecord.Store(0)
 	GateInfo.rebuildListenSec = 3
