@@ -231,9 +231,7 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 	readObj.Init(1) //进程间默认用模式1分割字节数据
 	readBuff, sliceBuffer := make([]byte, gateway_server.ConnReadBufSize), make([]byte, gateway_server.ReadStreamBufferSize)
 	var cutList gateway_server.CutIndexList
-	idx := 0
 	for {
-		idx = 0
 		num, readError := (*sCoon.gateSerConn).Read(readBuff)
 		if readError != nil {
 			if checkRes, descString := gateway_server.CheckIsCloseByRemote(readError); checkRes {
@@ -248,6 +246,7 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 		//把读取到的数据发送到处理逻辑通信道中,待注册函数做逻辑处理
 		cutList.Reset()
 		gateway_server.DoSplit(readObj, readBuff[0:], num, &cutList, sliceBuffer)
+		idx := 0
 		for i := 0; i < cutList.Len(); i++ {
 			elementIDX := cutList.Get(i)
 			if packetLen := elementIDX - idx; packetLen > 0 {
