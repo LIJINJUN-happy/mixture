@@ -28,15 +28,13 @@ func CreateLogger(logName, loggerPath string, sys bool) *LoggerObj {
 		return nil
 	}
 	loggerObj := new(LoggerObj)
-	if loggerObj.InitLogger(logName, loggerPath, sys) {
-		PrintMgrPtr.Del(logName)
-		PrintMgrPtr.Set(logName, loggerObj)
-		return loggerObj
-	}
-	return nil
+	loggerObj.InitLogger(logName, loggerPath, sys)
+	PrintMgrPtr.Del(logName)
+	PrintMgrPtr.Set(logName, loggerObj)
+	return loggerObj
 }
 
-func (l *LoggerObj) InitLogger(logName, loggerPath string, sys bool) bool {
+func (l *LoggerObj) InitLogger(logName, loggerPath string, sys bool) {
 	l.serName = logName
 	l.loggerPath = loggerPath
 
@@ -66,7 +64,6 @@ func (l *LoggerObj) InitLogger(logName, loggerPath string, sys bool) bool {
 		f, logError = os.Create(completeDirPath)
 		if logError != nil {
 			panic("Cant Find The Logger Path ,The Logger Path Value Is: " + completeDirPath)
-			return false
 		}
 	}
 
@@ -84,7 +81,6 @@ func (l *LoggerObj) InitLogger(logName, loggerPath string, sys bool) bool {
 	trueLv, res := strconv.Atoi(slogLevel)
 	if res != nil {
 		panic("slogLevel Error: " + res.Error())
-		return false
 	}
 	l.opts = new(slog.HandlerOptions)
 	l.opts.Level = slog.Level(trueLv)
@@ -92,7 +88,6 @@ func (l *LoggerObj) InitLogger(logName, loggerPath string, sys bool) bool {
 	l.osFile = f
 	l.textLogger = slog.New(slog.NewTextHandler(f, l.opts))
 	l.jsonLogger = slog.New(slog.NewJSONHandler(f, l.opts))
-	return true
 }
 
 func SetLoggerObj(log *LoggerObj) {
