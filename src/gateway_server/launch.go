@@ -151,7 +151,7 @@ func BeginLinkServer(sl *SerLinker) {
 			time.Sleep(GateInfo.rebuildListenSec * time.Second)
 			goto connTryAgain //链接失败再重新尝试,不成功就不创建dealWithLinkerData协程,避免协程泄露
 		} else {
-			printer.TextInfo("Link Success", "linkerName", serLinker.linkerName)
+			printer.TextInfo("Link Success", "LinkerName", serLinker.linkerName)
 			serLinker.serConn = &dial
 		}
 
@@ -323,7 +323,7 @@ func SendGateIDToRemoteSer(cn *net.Conn, linkerName string) {
 	cpSize := copy(body[dataIdxFrom:], dateByte)
 	num := DoPack(dataSlice, body, ReadStreamBufferObjectWay)
 	n, _ := (*cn).Write(dataSlice[:num])
-	printer.TextInfo("SendGateIDToRemoteSer", "sendNum", n, "LinkerAddress", (*cn).RemoteAddr().String(), "PackSize", cpSize, "linkerName", linkerName)
+	printer.TextInfo("SendGateIDToRemoteSer", "WriteDataSize", n, "LinkerAddress", (*cn).RemoteAddr().String(), "DataPackageSize", cpSize, "LinkerName", linkerName)
 }
 
 func CheckIsCloseByRemote(readError error) (bool, string) {
