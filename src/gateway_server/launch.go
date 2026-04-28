@@ -321,7 +321,10 @@ func SendGateIDToRemoteSer(cn *net.Conn, linkerName string) {
 	binary.BigEndian.PutUint16(body[SessionIdLen:dataIdxFrom], uint16(protoNum))
 	cpSize := copy(body[dataIdxFrom:], dateByte)
 	num := DoPack(dataSlice, body, ReadStreamBufferObjectWay)
-	n, _ := (*cn).Write(dataSlice[:num])
+	n, err := (*cn).Write(dataSlice[:num])
+	if err != nil {
+		panic(err)
+	}
 	printer.TextInfo("SendGateIDToRemoteSer", "WriteDataSize", n, "LinkerAddress", (*cn).RemoteAddr().String(), "DataPackageSize", cpSize, "LinkerName", linkerName)
 }
 
