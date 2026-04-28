@@ -179,7 +179,7 @@ func init() {
 func LoadProtocol(path string, allProto map[string]interface{}) {
 	ns, f := tools.ReadFileByName(path)
 	if (ns == nil) || (f == nil) {
-		panic(fmt.Sprintf("loadProtocol: failed to read %s", path))
+		panic(fmt.Sprintf("LoadProtocol: Failed to read %s", path))
 	}
 
 	defer func(readFile *os.File) {
@@ -204,7 +204,7 @@ func LoadProtocol(path string, allProto map[string]interface{}) {
 	jsonStr := jsonStrBuilder.String()
 	distributeConfigObj := new(distributeConfigInfo)
 	if json.Unmarshal([]byte(jsonStr), distributeConfigObj) != nil {
-		panic(fmt.Sprintf("failed to unmarshal %s", path))
+		panic(fmt.Sprintf("Failed Unmarshal %s", path))
 	}
 
 	//注意，obj不能为指针类型，否则会报：panic recovered: reflect: NumField of non-struct type
@@ -239,7 +239,7 @@ func LoadProtocol(path string, allProto map[string]interface{}) {
 				protoStartNum = 30000
 			}
 			if protoStartNum == 0 {
-				panic(fmt.Sprintf("route failed: distributeHead=%s sendServerTarget=%s", distributeHead, sendServerTarget))
+				panic(fmt.Sprintf("interior_pb switch sendServerTarget fail: distributeHead=%s sendServerTarget=%s", distributeHead, sendServerTarget))
 			}
 			lenOfValue := v.Field(k).Len()
 			for idx := 0; idx < lenOfValue; idx++ {
