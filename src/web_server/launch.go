@@ -18,8 +18,8 @@ func Run() {
 	}()
 
 	id, _ := strconv.Atoi(os.Args[2])
-	if !webSer.InitInfo("webSer", id) {
-		panic("webSer InitInfo Failed")
+	if err := webSer.InitInfo("webSer", id); err != nil {
+		panic(err)
 	}
 
 	go webSer.RegisterMonitorLogic(server_common.TranspondProtoPack)

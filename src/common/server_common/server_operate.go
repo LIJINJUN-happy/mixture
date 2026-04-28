@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"google.golang.org/protobuf/proto"
 	"mixture/proto/interior_json"
 	"mixture/proto/interior_pb/ipb"
@@ -54,10 +55,10 @@ var ReceivePacketBufPool = sync.Pool{
 	},
 }
 
-func (s *ServerInfo) InitInfo(serName string, id int) bool {
-	db, isOk := database.GetSQLiteConnDB()
-	if isOk != nil {
-		return false
+func (s *ServerInfo) InitInfo(serName string, id int) error {
+	db, dbErr := database.GetSQLiteConnDB()
+	if dbErr != nil {
+		return fmt.Errorf("InitInfo %s id=%d: %w", serName, id, dbErr)
 	}
 	defer func(dataBase *sql.DB) {
 		if dbCloseRes := db.Close(); dbCloseRes != nil {
@@ -67,26 +68,22 @@ func (s *ServerInfo) InitInfo(serName string, id int) bool {
 
 	address := database.GetSerAddressById(id, db, serName)
 	if address == "" {
-		printer.TextError(serName, "Server Address Is Null, ServerId", id)
-		return false
-	} else {
-		s.address = address
+		return fmt.Errorf("InitInfo %s id=%d: empty server address", serName, id)
 	}
+	s.address = address
 
 	port := database.GetSerPortById(id, db, serName)
 	if port <= 0 {
-		printer.TextError(serName, "Server port Is Error, ServerId", port)
-		return false
-	} else {
-		s.port = port
+		return fmt.Errorf("InitInfo %s id=%d: invalid server port %d", serName, id, port)
 	}
+	s.port = port
 	s.ServerName = serName
 	s.ServerId = id
 	s.listenObj = nil
 	s.connObjMap = make(map[int]*SerConnObj)
 	s.ServerHandleFuncMap = make(map[string]func(data []byte) error)
 	ServicePrt = s
-	return true
+	return nil
 }
 
 func (s *ServerInfo) SetListener(l *net.Listener) {

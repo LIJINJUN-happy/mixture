@@ -19,8 +19,8 @@ func Run() {
 	}()
 
 	id, _ := strconv.Atoi(os.Args[2])
-	if !actorSer.InitInfo("actorSer", id) {
-		panic("ActorServer InitInfo Failed")
+	if err := actorSer.InitInfo("actorSer", id); err != nil {
+		panic(err)
 	}
 
 	//创建进程监听服务以及进程接收的数据后的处理逻辑

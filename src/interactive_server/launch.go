@@ -18,8 +18,8 @@ func Run() {
 	}()
 
 	id, _ := strconv.Atoi(os.Args[2])
-	if !interactiveSer.InitInfo("interactiveSer", id) {
-		panic("InteractiveSer InitInfo Failed")
+	if err := interactiveSer.InitInfo("interactiveSer", id); err != nil {
+		panic(err)
 	}
 
 	go interactiveSer.RegisterMonitorLogic(server_common.TranspondProtoPack)

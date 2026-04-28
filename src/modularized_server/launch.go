@@ -18,8 +18,8 @@ func Run() {
 	}()
 
 	id, _ := strconv.Atoi(os.Args[2])
-	if !modularizedSer.InitInfo("modularizedSer", id) {
-		panic("modularizedSer InitInfo Failed")
+	if err := modularizedSer.InitInfo("modularizedSer", id); err != nil {
+		panic(err)
 	}
 
 	go modularizedSer.RegisterMonitorLogic(server_common.TranspondProtoPack)
