@@ -259,7 +259,10 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 				select {
 				case sCoon.receiveChannel <- bufPtr:
 				default:
-					return
+					//非阻塞写：满则丢包并打告警,避免下游慢导致整条网关连接被断开引发雪崩
+					*bufPtr = (*bufPtr)[:cap(*bufPtr)]
+					ReceivePacketBufPool.Put(bufPtr)
+					printer.TextWarn("BeginService", "Err", "receiveChannel Full", "ServerName", s.ServerName, "ServerId", s.ServerId, "GateId", sCoon.GetGateId())
 				}
 			}
 			idx = elementIDX
