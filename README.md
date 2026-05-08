@@ -215,7 +215,7 @@ Accept(conn)
  └── go DoReadMsg(newConn)
       ├── AddIntoGateMap(writeChan)        // 注册 SessionID → writeChan
       └── for {
-            SetReadDeadline(+900s)
+            SetReadDeadline(+180s)
             Read() → DealBufferData()
                       ├── DoSplit()        // 字节流切割
                       └── DoDistribute()  // 协议路由
@@ -429,7 +429,7 @@ DistributeDataPool.Put(&buf)               // ← 错误！
 
 ```go
 type CutIndexList struct {
-    data [256]int  // 存储各包在 sliceBuffer 中的结束下标
+    data [1024]int  // 存储各包在 sliceBuffer 中的结束下标
     len  int
 }
 ```
@@ -535,13 +535,13 @@ DoWriteMsg → DoPack(去除 SessionID 前缀) → Write 给客户端
 | `ConnReadBufSize` | 4096 B | 每次 Read 的原始字节缓冲 |
 | `ReadStreamBufferSize` | 5120 B | 池缓冲容量（包体上限 4096 + 余量） |
 | `MaxPacketBodySize` | 4096 B | 单包体最大长度，超出视为非法包并断连 |
-| `MaxPacketsPerRead` | 256 | 一次 Read 最多切出的包数（CutIndexList 容量） |
+| `MaxPacketsPerRead` | 1024 | 一次 Read 最多切出的包数（CutIndexList 容量） |
 | `ConnWriteChanCaps` | 64 | `NewConnection.writeChan` 容量 |
 | `channelBufferSize` | 1024 | `SerLinker.receiveChannel` 容量 |
 | `sendChannelSize` | 1024 | `SerConnObj.sendChannel` 容量 |
 | `receiveChannelSize` | 1024 | `SerConnObj.receiveChannel` 容量 |
 | `MaxConnectClientNum` | 10000 | 最大客户端并发连接数 |
-| `ConnReadTimeout` | 900 s | 客户端读超时（15 分钟） |
+| `ConnReadTimeout` | 180 s | 客户端读超时（3 分钟） |
 | `HeadLen` | 2 B | 包头长度（大端 uint16，存储包体字节数） |
 | `SessionIdLen` | 4 B | SessionID 字节长度（大端 uint32） |
 | `ProtoNumLen` | 2 B | 协议号字节长度（大端 uint16） |
