@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>Mixture 分布式游戏服务器框架 - 动态流程架构图</title>
+<style>
+  :root {
+    --bg-0: #0b1020;
+    --bg-1: #11182f;
+    --bg-2: #182142;
+    --line: #2a335c;
+    --txt: #e6ebff;
+    --muted: #9aa5d1;
+    --gate: #ff9f43;
+    --actor: #54e1c1;
+    --interactive: #7bb7ff;
+    --mod: #d390ff;
+    --web: #ffd166;
+    --client: #ff6b6b;
+    --mongo: #4cd97b;
+    --pool: #ffce5c;
+    --flow-up: #54e1c1;
+    --flow-down: #ff9f43;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: radial-gradient(ellipse at top, #1a2456 0%, var(--bg-0) 70%);
+    color: var(--txt);
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    min-height: 100%;
+  }
+  header {
+    text-align: center;
+    padding: 28px 16px 14px;
+    background: linear-gradient(180deg, rgba(255,159,67,0.15), transparent);
+  }
+  header h1 {
+    margin: 0 0 6px;
+    font-size: 28px;
+    letter-spacing: 2px;
+    background: linear-gradient(90deg, #ff9f43, #7bb7ff, #54e1c1, #d390ff);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  header p { color: var(--muted); margin: 4px 0; font-size: 14px; }
+
+  .tabs {
+    display: flex; justify-content: center; gap: 8px;
+    flex-wrap: wrap; padding: 8px 16px 0;
+  }
+  .tab {
+    background: var(--bg-1);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    padding: 8px 14px;
+    border-radius: 18px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+  .tab.active, .tab:hover {
+    background: linear-gradient(90deg, #ff9f43, #7bb7ff);
+    color: #0b1020;
+    border-color: transparent;
+    font-weight: 600;
+  }
+
+  main { padding: 16px clamp(8px, 2vw, 28px) 60px; }
+  .panel {
+    display: none;
+    background: rgba(17, 24, 47, 0.7);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 16px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  }
+  .panel.active { display: block; animation: fade 0.45s ease; }
+  @keyframes fade { from {opacity: 0; transform: translateY(8px);} to {opacity: 1; transform: translateY(0);} }
+  h2 {
+    margin: 0 0 14px;
+    font-size: 18px;
+    border-left: 4px solid var(--gate);
+    padding-left: 10px;
+  }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .col { flex: 1 1 280px; min-width: 240px; }
+
+  /* SVG 公共 */
+  svg { width: 100%; height: auto; display: block; }
+  .node-label { fill: var(--txt); font-size: 13px; font-weight: 600; }
+  .node-sub { fill: var(--muted); font-size: 11px; }
+  .arrow-line {
+    stroke-width: 2; fill: none;
+    stroke-dasharray: 6 6;
+  }
+  .legend {
+    display: flex; flex-wrap: wrap; gap: 12px;
+    margin-top: 10px;
+    font-size: 12px; color: var(--muted);
+  }
+  .legend span::before {
+    content: ""; display: inline-block;
+    width: 14px; height: 4px; margin-right: 6px;
+    vertical-align: middle;
+    border-radius: 2px;
+  }
+  .lg-up::before { background: var(--flow-up); }
+  .lg-down::before { background: var(--flow-down); }
+  .lg-ctrl::before { background: var(--mod); }
+
+  /* 流动粒子 */
+  .particle { r: 4; }
+  .pkt-up { fill: var(--flow-up); filter: drop-shadow(0 0 4px var(--flow-up)); }
+  .pkt-down { fill: var(--flow-down); filter: drop-shadow(0 0 4px var(--flow-down)); }
+  .pkt-ctrl { fill: var(--mod); filter: drop-shadow(0 0 4px var(--mod)); }
+
+  /* 拓扑节点矩形 */
+  .box {
+    rx: 10; ry: 10;
+    stroke-width: 2;
+    fill: #182142;
+  }
+  .box-client { stroke: var(--client); }
+  .box-gate { stroke: var(--gate); fill: #271a12; }
+  .box-actor { stroke: var(--actor); }
+  .box-interactive { stroke: var(--interactive); }
+  .box-mod { stroke: var(--mod); }
+  .box-web { stroke: var(--web); }
+  .box-mongo { stroke: var(--mongo); fill: #0f2418; }
+  .box-pool { stroke: var(--pool); fill: #2a2415; }
+
+  /* 信息条 */
+  .info {
+    background: rgba(8, 13, 30, 0.6);
+    border: 1px dashed var(--line);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-top: 14px;
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.7;
+  }
+  code, .mono {
+    font-family: "JetBrains Mono", Consolas, monospace;
+    color: #ffd28a;
+    font-size: 12px;
+    background: #0a0f25;
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  /* 控制条 */
+  .controls {
+    display: flex; gap: 10px; align-items: center;
+    flex-wrap: wrap; margin-bottom: 10px;
+  }
+  .controls button {
+    padding: 6px 12px;
+    background: var(--bg-1);
+    color: var(--txt);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .controls button:hover { border-color: var(--gate); color: var(--gate); }
+  .controls .speed { color: var(--muted); font-size: 12px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 13px;
+  }
+  th, td {
+    border-bottom: 1px solid var(--line);
+    padding: 6px 8px;
+    text-align: left;
+    color: var(--txt);
+  }
+  th { color: var(--gate); font-weight: 600; }
+  td.muted { color: var(--muted); }
+
+  /* 通道指示 */
+  .chan-label { fill: #ffce5c; font-size: 11px; font-style: italic; }
+
+  /* 模块卡片 */
+  .module-card {
+    background: linear-gradient(135deg, rgba(211,144,255,0.15), rgba(123,183,255,0.05));
+    border: 1px solid rgba(211,144,255,0.4);
+    border-radius: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+  }
+  .module-card h4 { margin: 0 0 6px; color: #d390ff; font-size: 14px; }
+  .module-card p { margin: 4px 0; font-size: 12px; color: var(--muted); }
+
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Mixture 分布式游戏服务器框架</h1>
+  <p>Golang · TCP/WebSocket · JSON/Protobuf · 进程化 · 模块化 · 零逃逸内存池</p>
+  <p style="font-size:12px;">动态流程架构图 · 可视化包流向 · 单击切换分区 · 点击「开始动画」演示数据流</p>
+</header>
+
+<div class="tabs">
+  <button class="tab active" data-target="topo">① 整体拓扑</button>
+  <button class="tab" data-target="gateway">② 网关内部</button>
+  <button class="tab" data-target="backend">③ 后端三协程</button>
+  <button class="tab" data-target="module">④ 模块系统</button>
+  <button class="tab" data-target="dataflow">⑤ 完整数据流</button>
+  <button class="tab" data-target="protocol">⑥ 协议路由 & 内存池</button>
+  <button class="tab" data-target="const">⑦ 常量速查</button>
+</div>
+
+<main>
+
+<!-- ============== 1 拓扑 ============== -->
+<section id="topo" class="panel active">
+  <h2>① 整体进程拓扑</h2>
+  <div class="controls">
+    <button onclick="toggleAnim('topo')">▶ 开始/暂停动画</button>
+    <span class="speed">客户端→网关→后端服务→MongoDB；4 条 SerLinker TCP 长连接</span>
+  </div>
+
+  <svg id="svg-topo" viewBox="0 0 1000 540">
+    <!-- 客户端集群 -->
+    <rect class="box box-client" x="40" y="40" width="180" height="80" />
+    <text class="node-label" x="130" y="72" text-anchor="middle">客户端 Client</text>
+    <text class="node-sub" x="130" y="92" text-anchor="middle">TCP / WebSocket</text>
+    <text class="node-sub" x="130" y="108" text-anchor="middle">[Head(2B)][ProtoNum(2B)][Data]</text>
+
+    <!-- Gateway -->
+    <rect class="box box-gate" x="370" y="30" width="260" height="120" />
+    <text class="node-label" x="500" y="58" text-anchor="middle">gateway_server</text>
+    <text class="node-sub" x="500" y="78" text-anchor="middle">DoReadMsg ↔ DoWriteMsg</text>
+    <text class="node-sub" x="500" y="94" text-anchor="middle">DoSplit → DoDistribute</text>
+    <text class="node-sub" x="500" y="110" text-anchor="middle">SerLinker × 4 (TCP dial)</text>
+    <text class="node-sub" x="500" y="126" text-anchor="middle">Session 管理 / 白名单 / 路由表</text>
+
+    <!-- 4 后端 -->
+    <rect class="box box-actor" x="60" y="240" width="180" height="90" />
+    <text class="node-label" x="150" y="270" text-anchor="middle">actor_server</text>
+    <text class="node-sub" x="150" y="288" text-anchor="middle">玩家核心逻辑</text>
+    <text class="node-sub" x="150" y="304" text-anchor="middle">SS_起始号 25000</text>
+
+    <rect class="box box-interactive" x="280" y="240" width="180" height="90" />
+    <text class="node-label" x="370" y="270" text-anchor="middle">interactive_server</text>
+    <text class="node-sub" x="370" y="288" text-anchor="middle">聊天 / 房间 / 实时交互</text>
+    <text class="node-sub" x="370" y="304" text-anchor="middle">SS_起始号 15000</text>
+
+    <rect class="box box-mod" x="500" y="240" width="200" height="90" />
+    <text class="node-label" x="600" y="270" text-anchor="middle">modularized_server</text>
+    <text class="node-sub" x="600" y="288" text-anchor="middle">通用扩展模块横向扩展</text>
+    <text class="node-sub" x="600" y="304" text-anchor="middle">SS_起始号 10000</text>
+
+    <rect class="box box-web" x="740" y="240" width="200" height="90" />
+    <text class="node-label" x="840" y="270" text-anchor="middle">web_server</text>
+    <text class="node-sub" x="840" y="288" text-anchor="middle">HTTP / WebSocket 接口</text>
+    <text class="node-sub" x="840" y="304" text-anchor="middle">SS_起始号 20000</text>
+
+    <!-- Mongo -->
+    <rect class="box box-mongo" x="340" y="430" width="320" height="80" />
+    <text class="node-label" x="500" y="458" text-anchor="middle">MongoDB · 读写分离</text>
+    <text class="node-sub" x="500" y="476" text-anchor="middle">atomic.Pointer[mongo.Client] R/W</text>
+    <text class="node-sub" x="500" y="494" text-anchor="middle">StartMongoHealthCheck 30s Ping</text>
+
+    <!-- MemCache -->
+    <rect class="box box-pool" x="760" y="40" width="200" height="80" />
+    <text class="node-label" x="860" y="68" text-anchor="middle">Memcached</text>
+    <text class="node-sub" x="860" y="86" text-anchor="middle">NoSQL 缓存（减压）</text>
+    <text class="node-sub" x="860" y="104" text-anchor="middle">StartMemCacheHealthCheck</text>
+
+    <!-- 连线 客户端->Gateway 双向 -->
+    <path id="path-c2g" d="M 220 80 L 370 80" class="arrow-line" stroke="var(--flow-up)" />
+    <path id="path-g2c" d="M 370 100 L 220 100" class="arrow-line" stroke="var(--flow-down)" />
+
+    <!-- Gateway -> 后端 -->
+    <path id="path-g2actor" d="M 430 150 Q 350 200 150 240" class="arrow-line" stroke="var(--actor)" />
+    <path id="path-g2inter" d="M 470 150 Q 420 200 370 240" class="arrow-line" stroke="var(--interactive)" />
+    <path id="path-g2mod"   d="M 540 150 Q 580 200 600 240" class="arrow-line" stroke="var(--mod)" />
+    <path id="path-g2web"   d="M 600 150 Q 730 200 840 240" class="arrow-line" stroke="var(--web)" />
+
+    <!-- 后端 -> Mongo -->
+    <path d="M 150 330 Q 280 400 400 430" class="arrow-line" stroke="var(--mongo)" />
+    <path d="M 370 330 Q 420 400 460 430" class="arrow-line" stroke="var(--mongo)" />
+    <path d="M 600 330 Q 580 400 540 430" class="arrow-line" stroke="var(--mongo)" />
+    <path d="M 840 330 Q 720 400 600 430" class="arrow-line" stroke="var(--mongo)" />
+
+    <!-- 移动粒子 - 动画 -->
+    <circle class="particle pkt-up topo-anim" r="5">
+      <animateMotion dur="2.8s" repeatCount="indefinite">
+        <mpath href="#path-c2g"/>
+      </animateMotion>
+    </circle>
+    <circle class="particle pkt-down topo-anim" r="5">
+      <animateMotion dur="2.8s" repeatCount="indefinite" begin="1.4s">
+        <mpath href="#path-g2c"/>
+      </animateMotion>
+    </circle>
+    <circle class="particle pkt-up topo-anim" fill="var(--actor)" r="4">
+      <animateMotion dur="3s" repeatCount="indefinite"><mpath href="#path-g2actor"/></animateMotion>
+    </circle>
+    <circle class="particle pkt-up topo-anim" fill="var(--interactive)" r="4">
+      <animateMotion dur="3.2s" repeatCount="indefinite" begin="0.6s"><mpath href="#path-g2inter"/></animateMotion>
+    </circle>
+    <circle class="particle pkt-up topo-anim" fill="var(--mod)" r="4">
+      <animateMotion dur="3s" repeatCount="indefinite" begin="1.0s"><mpath href="#path-g2mod"/></animateMotion>
+    </circle>
+    <circle class="particle pkt-up topo-anim" fill="var(--web)" r="4">
+      <animateMotion dur="3.4s" repeatCount="indefinite" begin="1.6s"><mpath href="#path-g2web"/></animateMotion>
+    </circle>
+  </svg>
+
+  <div class="legend">
+    <span class="lg-up">上行（客户端 → 后端）</span>
+    <span class="lg-down">下行（后端 → 客户端）</span>
+    <span class="lg-ctrl">控制 / 模块调用</span>
+  </div>
+
+  <div class="info">
+    <b>启动顺序（gateway_server/launch.go: Run）：</b>
+    <code>GetSQLiteConnDB</code> → <code>DoInit</code> → <code>BeginGateServer</code>
+    → <code>sleep 2s</code> → <code>BeginLinkServer(Web/Actor/Modularized/Interactive)</code> → <code>Looping</code>。
+    后端服务通过 <code>RegisterMonitorLogic</code> 监听 gateway 主动 dial 过来的 TCP 长连接，断线后由
+    <code>BeginLinkServer</code> 的 <code>goto connTryAgain</code> 模式自动重连。
+  </div>
+</section>
+
+<!-- ============== 2 网关内部 ============== -->
+<section id="gateway" class="panel">
+  <h2>② 网关内部：DoReadMsg / DoSplit / DoDistribute / SerLinker</h2>
+
+  <svg viewBox="0 0 1000 460">
+    <!-- 客户端 -->
+    <rect class="box box-client" x="20" y="40" width="120" height="60" />
+    <text class="node-label" x="80" y="68" text-anchor="middle">Client</text>
+    <text class="node-sub" x="80" y="86" text-anchor="middle">TCP/WS Conn</text>
+
+    <!-- DoReadMsg -->
+    <rect class="box box-gate" x="180" y="20" width="180" height="100" />
+    <text class="node-label" x="270" y="48" text-anchor="middle">DoReadMsg (G)</text>
+    <text class="node-sub" x="270" y="66" text-anchor="middle">SetReadDeadline +180s</text>
+    <text class="node-sub" x="270" y="82" text-anchor="middle">Read → DealBufferData</text>
+    <text class="node-sub" x="270" y="100" text-anchor="middle">AddIntoGateMap(sessionID)</text>
+
+    <!-- DoSplit -->
+    <rect class="box box-gate" x="400" y="20" width="180" height="100" />
+    <text class="node-label" x="490" y="48" text-anchor="middle">DoSplit</text>
+    <text class="node-sub" x="490" y="66" text-anchor="middle">ReadStreamBufferObject</text>
+    <text class="node-sub" x="490" y="82" text-anchor="middle">字节流状态机</text>
+    <text class="node-sub" x="490" y="100" text-anchor="middle">→ CutIndexList[1024]</text>
+
+    <!-- DoDistribute -->
+    <rect class="box box-gate" x="620" y="20" width="200" height="100" />
+    <text class="node-label" x="720" y="48" text-anchor="middle">DoDistribute</text>
+    <text class="node-sub" x="720" y="66" text-anchor="middle">DistributeDataPool.Get()</text>
+    <text class="node-sub" x="720" y="82" text-anchor="middle">填充 [SID][PNum][Data]</text>
+    <text class="node-sub" x="720" y="100" text-anchor="middle">ProtoDistributeArray[O(1)]</text>
+
+    <!-- SerLinker × 4 -->
+    <rect class="box box-actor" x="500" y="180" width="180" height="60" />
+    <text class="node-label" x="590" y="208" text-anchor="middle">ActorSerLinker</text>
+    <text class="node-sub" x="590" y="226" text-anchor="middle">receiveChannel(1024)</text>
+
+    <rect class="box box-interactive" x="700" y="180" width="180" height="60" />
+    <text class="node-label" x="790" y="208" text-anchor="middle">InteractiveSerLinker</text>
+    <text class="node-sub" x="790" y="226" text-anchor="middle">非阻塞 select/default</text>
+
+    <rect class="box box-mod" x="500" y="260" width="180" height="60" />
+    <text class="node-label" x="590" y="288" text-anchor="middle">ModularizedSerLinker</text>
+    <text class="node-sub" x="590" y="306" text-anchor="middle">DealWithLinkerData</text>
+
+    <rect class="box box-web" x="700" y="260" width="180" height="60" />
+    <text class="node-label" x="790" y="288" text-anchor="middle">WebSerLinker</text>
+    <text class="node-sub" x="790" y="306" text-anchor="middle">DoPack → TCP Write</text>
+
+    <!-- 回路到 DoWriteMsg -->
+    <rect class="box box-gate" x="180" y="180" width="180" height="100" />
+    <text class="node-label" x="270" y="210" text-anchor="middle">DoWriteMsg (G)</text>
+    <text class="node-sub" x="270" y="228" text-anchor="middle">writeChan(64)</text>
+    <text class="node-sub" x="270" y="244" text-anchor="middle">DoPack(去 SessionID)</text>
+    <text class="node-sub" x="270" y="262" text-anchor="middle">→ Write 客户端</text>
+
+    <!-- GateClientMap -->
+    <rect class="box box-pool" x="20" y="180" width="120" height="100" />
+    <text class="node-label" x="80" y="208" text-anchor="middle">GateClientMap</text>
+    <text class="node-sub" x="80" y="226" text-anchor="middle">sessionID →</text>
+    <text class="node-sub" x="80" y="244" text-anchor="middle">writeChan</text>
+
+    <!-- ReadStreamBuffer / Pool -->
+    <rect class="box box-pool" x="20" y="350" width="280" height="80" />
+    <text class="node-label" x="160" y="378" text-anchor="middle">DistributeDataPool (sync.Pool)</text>
+    <text class="node-sub" x="160" y="396" text-anchor="middle">*[]byte cap=5120</text>
+    <text class="node-sub" x="160" y="412" text-anchor="middle">DoDistribute Get → 回包 Put</text>
+
+    <rect class="box box-pool" x="340" y="350" width="280" height="80" />
+    <text class="node-label" x="480" y="378" text-anchor="middle">CutIndexList</text>
+    <text class="node-sub" x="480" y="396" text-anchor="middle">[1024]int 栈分配</text>
+    <text class="node-sub" x="480" y="412" text-anchor="middle">替代 container/list, 零 GC</text>
+
+    <rect class="box box-pool" x="660" y="350" width="280" height="80" />
+    <text class="node-label" x="800" y="378" text-anchor="middle">ProtocolDistributeInfo</text>
+    <text class="node-sub" x="800" y="396" text-anchor="middle">[math.MaxUint16] 数组</text>
+    <text class="node-sub" x="800" y="412" text-anchor="middle">协议号→服务名 O(1)</text>
+
+    <!-- 连线（动画路径） -->
+    <path id="p-c2dr" d="M 140 70 L 180 70" stroke="var(--flow-up)" class="arrow-line"/>
+    <path id="p-dr2ds" d="M 360 70 L 400 70" stroke="var(--flow-up)" class="arrow-line"/>
+    <path id="p-ds2dd" d="M 580 70 L 620 70" stroke="var(--flow-up)" class="arrow-line"/>
+    <path id="p-dd2act" d="M 700 120 Q 640 160 590 180" stroke="var(--actor)" class="arrow-line"/>
+    <path id="p-dd2int" d="M 760 120 Q 790 160 790 180" stroke="var(--interactive)" class="arrow-line"/>
+    <path id="p-dd2mod" d="M 700 120 Q 620 200 590 260" stroke="var(--mod)" class="arrow-line"/>
+    <path id="p-dd2web" d="M 760 120 Q 830 220 790 260" stroke="var(--web)" class="arrow-line"/>
+    <!-- 后端 -> writeChan(回流) -->
+    <path id="p-back2dw" d="M 500 210 L 360 220" stroke="var(--flow-down)" class="arrow-line"/>
+    <path id="p-map2dw" d="M 140 230 L 180 230" stroke="var(--mod)" class="arrow-line"/>
+    <path id="p-dw2c" d="M 180 250 Q 140 250 140 100" stroke="var(--flow-down)" class="arrow-line"/>
+
+    <!-- 粒子 -->
+    <circle class="particle pkt-up" r="4"><animateMotion dur="2.6s" repeatCount="indefinite"><mpath href="#p-c2dr"/></animateMotion></circle>
+    <circle class="particle pkt-up" r="4"><animateMotion dur="2.6s" repeatCount="indefinite" begin="0.5s"><mpath href="#p-dr2ds"/></animateMotion></circle>
+    <circle class="particle pkt-up" r="4"><animateMotion dur="2.6s" repeatCount="indefinite" begin="1.0s"><mpath href="#p-ds2dd"/></animateMotion></circle>
+    <circle class="particle" fill="var(--actor)" r="4"><animateMotion dur="2.8s" repeatCount="indefinite" begin="1.4s"><mpath href="#p-dd2act"/></animateMotion></circle>
+    <circle class="particle" fill="var(--interactive)" r="4"><animateMotion dur="2.8s" repeatCount="indefinite" begin="1.8s"><mpath href="#p-dd2int"/></animateMotion></circle>
+    <circle class="particle" fill="var(--mod)" r="4"><animateMotion dur="2.8s" repeatCount="indefinite" begin="2.2s"><mpath href="#p-dd2mod"/></animateMotion></circle>
+    <circle class="particle" fill="var(--web)" r="4"><animateMotion dur="2.8s" repeatCount="indefinite" begin="2.6s"><mpath href="#p-dd2web"/></animateMotion></circle>
+
+    <circle class="particle pkt-down" r="4"><animateMotion dur="3.0s" repeatCount="indefinite" begin="3.0s"><mpath href="#p-back2dw"/></animateMotion></circle>
+    <circle class="particle pkt-down" r="4"><animateMotion dur="3.0s" repeatCount="indefinite" begin="3.5s"><mpath href="#p-dw2c"/></animateMotion></circle>
+  </svg>
+
+  <div class="info">
+    <b>关键路径：</b>
+    客户端字节流 → <code>DoSplit</code> 按模式1（2B 包头长度前缀，<code>MaxPacketBodySize=4096</code>，超长断连）切包到 <code>sliceBuffer</code>，
+    各包结束下标写入栈上 <code>CutIndexList[1024]</code>；<br/>
+    <code>DoDistribute</code> 从 <code>DistributeDataPool</code> 取 <code>*[]byte</code>，
+    填入 <code>[SessionID 4B][ProtoNum 2B][Data]</code>，<b>缩切后</b> 把指针通过 <code>SafeSendToLinker</code>
+    非阻塞投递到 <code>SerLinker.receiveChannel</code>；channel 满则直接 <code>Put</code> 回池，绝不阻塞路由协程。<br/>
+    回包路径：后端 → SerLinker → <code>DoDistribute(sourceSession=0)</code> →
+    <code>GateClientMap[sessionID].writeChan</code> → <code>DoWriteMsg</code> 去除 SessionID 前缀 → 写客户端。
+  </div>
+</section>
+
+<!-- ============== 3 后端三协程 ============== -->
+<section id="backend" class="panel">
+  <h2>③ 后端服务公共层 server_common · 三协程模型 + 握手</h2>
+
+  <svg viewBox="0 0 1000 460">
+    <!-- gateway socket -->
+    <rect class="box box-gate" x="40" y="60" width="160" height="80" />
+    <text class="node-label" x="120" y="92" text-anchor="middle">Gateway TCP</text>
+    <text class="node-sub" x="120" y="110" text-anchor="middle">RegisterMonitorLogic 监听</text>
+    <text class="node-sub" x="120" y="126" text-anchor="middle">Accept → SerConnObj.Init</text>
+
+    <!-- BeginService -->
+    <rect class="box box-actor" x="250" y="40" width="220" height="130" />
+    <text class="node-label" x="360" y="68" text-anchor="middle">BeginService (主)</text>
+    <text class="node-sub" x="360" y="86" text-anchor="middle">Read → DoSplit</text>
+    <text class="node-sub" x="360" y="102" text-anchor="middle">ReceivePacketBufPool.Get</text>
+    <text class="node-sub" x="360" y="118" text-anchor="middle">select { receiveChannel ← bufPtr</text>
+    <text class="node-sub" x="360" y="134" text-anchor="middle">default → 丢包告警避免雪崩 }</text>
+    <text class="node-sub" x="360" y="152" text-anchor="middle">ctx.WithCancel 联动两子协程</text>
+
+    <!-- Dispose -->
+    <rect class="box box-interactive" x="520" y="30" width="220" height="120" />
+    <text class="node-label" x="630" y="58" text-anchor="middle">Dispose 协程</text>
+    <text class="node-sub" x="630" y="76" text-anchor="middle">receiveChannel → 解 ProtoNum</text>
+    <text class="node-sub" x="630" y="92" text-anchor="middle">protoNum==0 &amp; gateId&lt;0 ⇒ 握手</text>
+    <text class="node-sub" x="630" y="108" text-anchor="middle">GateIdSyncInfo → SetGateId</text>
+    <text class="node-sub" x="630" y="124" text-anchor="middle">否则 → TranspondProtoPack</text>
+    <text class="node-sub" x="630" y="140" text-anchor="middle">defer Put(ReceivePacketBufPool)</text>
+
+    <!-- Transmit -->
+    <rect class="box box-mod" x="520" y="170" width="220" height="120" />
+    <text class="node-label" x="630" y="198" text-anchor="middle">Transmit 协程</text>
+    <text class="node-sub" x="630" y="216" text-anchor="middle">sendChannel(1024) ← bufPtr</text>
+    <text class="node-sub" x="630" y="232" text-anchor="middle">DoPack → (*gateSerConn).Write</text>
+    <text class="node-sub" x="630" y="248" text-anchor="middle">写失败 / ctx.Done → 退出</text>
+    <text class="node-sub" x="630" y="264" text-anchor="middle">defer DeliveryMsgBufPool.Put</text>
+
+    <!-- TranspondProtoPack -->
+    <rect class="box box-pool" x="790" y="30" width="190" height="120" />
+    <text class="node-label" x="885" y="58" text-anchor="middle">TranspondProtoPack</text>
+    <text class="node-sub" x="885" y="76" text-anchor="middle">ProtoName2ModMap[name]</text>
+    <text class="node-sub" x="885" y="92" text-anchor="middle">ProtoPackInfoPool.Get</text>
+    <text class="node-sub" x="885" y="108" text-anchor="middle">→ Module.receiptChan</text>
+    <text class="node-sub" x="885" y="124" text-anchor="middle">未匹配 → TryCallServerFunc</text>
+
+    <!-- DeliveryMsg -->
+    <rect class="box box-pool" x="790" y="170" width="190" height="120" />
+    <text class="node-label" x="885" y="198" text-anchor="middle">DeliveryMsg</text>
+    <text class="node-sub" x="885" y="216" text-anchor="middle">ProtoNameMap[name]→ num</text>
+    <text class="node-sub" x="885" y="232" text-anchor="middle">DeliveryMsgBufPool.Get</text>
+    <text class="node-sub" x="885" y="248" text-anchor="middle">填充[SID][PN][Data] 缩切</text>
+    <text class="node-sub" x="885" y="264" text-anchor="middle">非阻塞 → sendChannel</text>
+
+    <!-- 业务模块 -->
+    <rect class="box box-actor" x="250" y="220" width="220" height="100" />
+    <text class="node-label" x="360" y="246" text-anchor="middle">业务模块 LoadMod</text>
+    <text class="node-sub" x="360" y="264" text-anchor="middle">HandleFuncMap[proName]</text>
+    <text class="node-sub" x="360" y="280" text-anchor="middle">→ 处理逻辑 → DeliveryMsg</text>
+    <text class="node-sub" x="360" y="296" text-anchor="middle">defer Put(ProtoPackInfoPool)</text>
+
+    <!-- ConnObjMap -->
+    <rect class="box box-mongo" x="40" y="200" width="160" height="80" />
+    <text class="node-label" x="120" y="232" text-anchor="middle">connObjMap</text>
+    <text class="node-sub" x="120" y="250" text-anchor="middle">gateId → SerConnObj</text>
+    <text class="node-sub" x="120" y="268" text-anchor="middle">sync.RWMutex</text>
+
+    <!-- 连线 -->
+    <path id="b-gw2bs" d="M 200 100 L 250 100" stroke="var(--flow-up)" class="arrow-line"/>
+    <path id="b-bs2dp" d="M 470 90 L 520 90" stroke="var(--flow-up)" class="arrow-line"/>
+    <path id="b-dp2tp" d="M 740 80 L 790 80" stroke="var(--flow-up)" class="arrow-line"/>
+    <path id="b-tp2mod" d="M 885 150 Q 700 200 470 250" stroke="var(--mod)" class="arrow-line"/>
+    <path id="b-mod2dm" d="M 470 260 Q 700 240 790 220" stroke="var(--flow-down)" class="arrow-line"/>
+    <path id="b-dm2tx" d="M 790 230 L 740 230" stroke="var(--flow-down)" class="arrow-line"/>
+    <path id="b-tx2gw" d="M 520 230 Q 350 320 200 130" stroke="var(--flow-down)" class="arrow-line"/>
+
+    <!-- 粒子 -->
+    <circle class="particle pkt-up" r="4"><animateMotion dur="2.5s" repeatCount="indefinite"><mpath href="#b-gw2bs"/></animateMotion></circle>
+    <circle class="particle pkt-up" r="4"><animateMotion dur="2.5s" repeatCount="indefinite" begin="0.4s"><mpath href="#b-bs2dp"/></animateMotion></circle>
+    <circle class="particle pkt-up" r="4"><animateMotion dur="2.5s" repeatCount="indefinite" begin="0.9s"><mpath href="#b-dp2tp"/></animateMotion></circle>
+    <circle class="particle pkt-ctrl" r="4"><animateMotion dur="2.8s" repeatCount="indefinite" begin="1.4s"><mpath href="#b-tp2mod"/></animateMotion></circle>
+    <circle class="particle pkt-down" r="4"><animateMotion dur="2.8s" repeatCount="indefinite" begin="2.2s"><mpath href="#b-mod2dm"/></animateMotion></circle>
+    <circle class="particle pkt-down" r="4"><animateMotion dur="2.5s" repeatCount="indefinite" begin="3.0s"><mpath href="#b-dm2tx"/></animateMotion></circle>
+    <circle class="particle pkt-down" r="4"><animateMotion dur="3.0s" repeatCount="indefinite" begin="3.5s"><mpath href="#b-tx2gw"/></animateMotion></circle>
+  </svg>
+
+  <div class="info">
+    <b>三协程 + ctx 联动：</b> <code>BeginService</code> 主协程负责 Read + DoSplit，
+    <code>context.WithCancel</code> 创建的 <code>ctx</code> 在 return 时 <code>defer cancel()</code>，
+    自动通知 <code>Transmit / Dispose</code> 退出，杜绝协程泄漏。<br/>
+    <b>握手流程：</b> Dispose 收到 <code>protoNum==0 &amp;&amp; gateId&lt;0</code> 的首包，解析
+    <code>GateIdSyncInfo</code>（JSON 或 Protobuf），通过 <code>CheckConnObjIsExist</code>
+    防止重复 GateID，再 <code>SetGateId + AddConnObj</code>。<br/>
+    <b>背压：</b> <code>BeginService</code> 写 receiveChannel 用 <code>select/default</code>，
+    满则归还池并打告警（避免下游慢导致整条网关连接被断开引发雪崩）。
+  </div>
+</section>
+
+<!-- ============== 4 模块系统 ============== -->
+<section id="module" class="panel">
+  <h2>④ 模块系统 ServerModule · 单协程模型 + 同步/异步调用</h2>
+
+  <div class="row">
+    <div class="col">
+      <svg viewBox="0 0 540 460">
+        <!-- 协议包入口 -->
+        <rect class="box box-pool" x="20" y="20" width="200" height="60"/>
+        <text class="node-label" x="120" y="48" text-anchor="middle">TranspondProtoPack</text>
+        <text class="node-sub" x="120" y="66" text-anchor="middle">ProtoPackInfoPool.Get</text>
+
+        <rect class="box box-pool" x="20" y="100" width="200" height="60"/>
+        <text class="node-label" x="120" y="128" text-anchor="middle">SynchronousPack2Module</text>
+        <text class="node-sub" x="120" y="146" text-anchor="middle">/ AsynchronousPack2Module</text>
+
+        <!-- receiptChan -->
+        <rect class="box box-mod" x="260" y="60" width="120" height="80"/>
+        <text class="node-label" x="320" y="92" text-anchor="middle">receiptChan</text>
+        <text class="node-sub" x="320" y="110" text-anchor="middle">chan interface{}</text>
+        <text class="node-sub" x="320" y="126" text-anchor="middle">默认 cap=2048</text>
+
+        <!-- LoadMod 协程 -->
+        <rect class="box box-actor" x="400" y="40" width="130" height="180"/>
+        <text class="node-label" x="465" y="68" text-anchor="middle">LoadMod (goroutine)</text>
+        <text class="node-sub" x="465" y="86" text-anchor="middle">for select {</text>
+        <text class="node-sub" x="465" y="102" text-anchor="middle">closeChan→ServerDown</text>
+        <text class="node-sub" x="465" y="118" text-anchor="middle">receiptChan→</text>
+        <text class="node-sub" x="465" y="134" text-anchor="middle">  ProtoPack→HandleProto</text>
+        <text class="node-sub" x="465" y="150" text-anchor="middle">  ModulePack→Handle…</text>
+        <text class="node-sub" x="465" y="166" text-anchor="middle">modTimer (1h心跳)</text>
+        <text class="node-sub" x="465" y="184" text-anchor="middle">}</text>
+        <text class="node-sub" x="465" y="204" text-anchor="middle">defer wg.Done</text>
+
+        <!-- HandleProto -->
+        <rect class="box box-interactive" x="20" y="220" width="200" height="80"/>
+        <text class="node-label" x="120" y="248" text-anchor="middle">HandleProtoPack</text>
+        <text class="node-sub" x="120" y="266" text-anchor="middle">HandleFuncMap[name]</text>
+        <text class="node-sub" x="120" y="284" text-anchor="middle">defer Put(ProtoPackPool)</text>
+
+        <!-- HandleModule -->
+        <rect class="box box-web" x="20" y="320" width="200" height="80"/>
+        <text class="node-label" x="120" y="348" text-anchor="middle">HandleModulePack</text>
+        <text class="node-sub" x="120" y="366" text-anchor="middle">InterfaceFuncMap[fn]</text>
+        <text class="node-sub" x="120" y="384" text-anchor="middle">ReturnChan != nil → 同步返回</text>
+
+        <!-- 协议→模块映射 -->
+        <rect class="box box-pool" x="260" y="200" width="270" height="80"/>
+        <text class="node-label" x="395" y="226" text-anchor="middle">ProtoName2ModMap</text>
+        <text class="node-sub" x="395" y="244" text-anchor="middle">protoName → 模块 receiptChan</text>
+        <text class="node-sub" x="395" y="260" text-anchor="middle">InterfaceName2ModMap</text>
+
+        <!-- 业务示例 user 模块 -->
+        <rect class="box box-mongo" x="260" y="300" width="270" height="110"/>
+        <text class="node-label" x="395" y="328" text-anchor="middle">业务模块示例 (user)</text>
+        <text class="node-sub" x="395" y="346" text-anchor="middle">CreateMod("user", 2048,</text>
+        <text class="node-sub" x="395" y="362" text-anchor="middle">  user.ModInit, user.ServerDown, &amp;wg)</text>
+        <text class="node-sub" x="395" y="378" text-anchor="middle">RegisterProtoHandleCaller("C2STest", ...)</text>
+        <text class="node-sub" x="395" y="394" text-anchor="middle">RegisterInterfaceHandleCaller("GetUserInfo", ...)</text>
+
+        <!-- 连线 -->
+        <path id="m-tp2rc" d="M 220 50 Q 250 50 260 100" class="arrow-line" stroke="var(--flow-up)"/>
+        <path id="m-sp2rc" d="M 220 130 L 260 130" class="arrow-line" stroke="var(--mod)"/>
+        <path id="m-rc2lm" d="M 380 100 L 400 100" class="arrow-line" stroke="var(--flow-up)"/>
+        <path id="m-lm2hp" d="M 410 220 Q 250 270 220 260" class="arrow-line" stroke="var(--flow-up)"/>
+        <path id="m-lm2hm" d="M 410 220 Q 250 380 220 360" class="arrow-line" stroke="var(--mod)"/>
+
+        <circle class="particle pkt-up" r="4"><animateMotion dur="2.5s" repeatCount="indefinite"><mpath href="#m-tp2rc"/></animateMotion></circle>
+        <circle class="particle pkt-ctrl" r="4"><animateMotion dur="2.5s" repeatCount="indefinite" begin="0.6s"><mpath href="#m-sp2rc"/></animateMotion></circle>
+        <circle class="particle pkt-up" r="4"><animateMotion dur="2.0s" repeatCount="indefinite" begin="1.2s"><mpath href="#m-rc2lm"/></animateMotion></circle>
+        <circle class="particle pkt-up" r="4"><animateMotion dur="2.4s" repeatCount="indefinite" begin="1.8s"><mpath href="#m-lm2hp"/></animateMotion></circle>
+        <circle class="particle pkt-ctrl" r="4"><animateMotion dur="2.6s" repeatCount="indefinite" begin="2.2s"><mpath href="#m-lm2hm"/></animateMotion></circle>
+      </svg>
+    </div>
+
+    <div class="col">
+      <div class="module-card">
+        <h4>模块特性</h4>
+        <p>每个模块独占 1 个 goroutine，<b>完全无锁</b>，所有数据通过 channel 进出。</p>
+        <p>同进程不同模块通过 <code>SynchronousPack2Module / AsynchronousPack2Module</code> 互调。</p>
+      </div>
+      <div class="module-card">
+        <h4>同步调用</h4>
+        <p><code>SynchronousPack2Module(modName, "GetUserInfo", args)</code></p>
+        <p>从 <code>ModulePackInfoPool</code> 取包，<code>ReturnChan := make(chan, 1)</code>，timer 默认 10s 超时。</p>
+      </div>
+      <div class="module-card">
+        <h4>异步调用</h4>
+        <p><code>AsynchronousPack2Module(modName, "UpdateScore", args)</code></p>
+        <p><code>ReturnChan = nil</code>，目标模块处理后不回传。</p>
+      </div>
+      <div class="module-card">
+        <h4>关闭流程</h4>
+        <p><code>closeChan</code> 监听 SIGINT/SIGTERM → 调用 <code>ServerDown</code> → <code>wg.Done</code>。</p>
+        <p>defer recover + PanicStack，保证 panic 不会传染主线。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============== 5 完整数据流 ============== -->
+<section id="dataflow" class="panel">
+  <h2>⑤ 完整数据流 · 上行 + 下行 · 端到端动画</h2>
+
+  <svg viewBox="0 0 1000 540">
+    <!-- Client -->
+    <rect class="box box-client" x="20" y="240" width="100" height="60"/>
+    <text class="node-label" x="70" y="272" text-anchor="middle">Client</text>
+    <text class="node-sub" x="70" y="290" text-anchor="middle">[H][PN][Data]</text>
+
+    <!-- Gateway 三块 -->
+    <rect class="box box-gate" x="160" y="80" width="200" height="80"/>
+    <text class="node-label" x="260" y="108" text-anchor="middle">DoReadMsg</text>
+    <text class="node-sub" x="260" y="126" text-anchor="middle">Read + DoSplit</text>
+    <text class="node-sub" x="260" y="142" text-anchor="middle">→ CutIndexList</text>
+
+    <rect class="box box-gate" x="160" y="180" width="200" height="80"/>
+    <text class="node-label" x="260" y="208" text-anchor="middle">DoDistribute</text>
+    <text class="node-sub" x="260" y="226" text-anchor="middle">DistributeDataPool.Get</text>
+    <text class="node-sub" x="260" y="242" text-anchor="middle">填 [SID][PN][Data]</text>
+
+    <rect class="box box-gate" x="160" y="380" width="200" height="80"/>
+    <text class="node-label" x="260" y="408" text-anchor="middle">DoWriteMsg</text>
+    <text class="node-sub" x="260" y="426" text-anchor="middle">writeChan ← bufPtr</text>
+    <text class="node-sub" x="260" y="442" text-anchor="middle">去前缀 → Write Client</text>
+
+    <!-- SerLinker -->
+    <rect class="box box-actor" x="410" y="120" width="200" height="80"/>
+    <text class="node-label" x="510" y="148" text-anchor="middle">SerLinker</text>
+    <text class="node-sub" x="510" y="166" text-anchor="middle">DealWithLinkerData</text>
+    <text class="node-sub" x="510" y="182" text-anchor="middle">DoPack → TCP Write</text>
+
+    <rect class="box box-mod" x="410" y="340" width="200" height="80"/>
+    <text class="node-label" x="510" y="368" text-anchor="middle">SerLinker (回)</text>
+    <text class="node-sub" x="510" y="386" text-anchor="middle">Read → DoSplit</text>
+    <text class="node-sub" x="510" y="402" text-anchor="middle">→ DoDistribute(src=0)</text>
+
+    <!-- Backend service -->
+    <rect class="box box-interactive" x="670" y="80" width="220" height="100"/>
+    <text class="node-label" x="780" y="108" text-anchor="middle">BeginService</text>
+    <text class="node-sub" x="780" y="126" text-anchor="middle">Read + DoSplit</text>
+    <text class="node-sub" x="780" y="142" text-anchor="middle">receiveChannel ← bufPtr</text>
+    <text class="node-sub" x="780" y="158" text-anchor="middle">Dispose → TranspondProtoPack</text>
+
+    <rect class="box box-actor" x="670" y="220" width="220" height="100"/>
+    <text class="node-label" x="780" y="248" text-anchor="middle">业务模块 LoadMod</text>
+    <text class="node-sub" x="780" y="266" text-anchor="middle">HandleProtoPack → 业务</text>
+    <text class="node-sub" x="780" y="282" text-anchor="middle">调用 DeliveryMsg 回包</text>
+    <text class="node-sub" x="780" y="298" text-anchor="middle">访问 MongoDB / Memcache</text>
+
+    <rect class="box box-pool" x="670" y="360" width="220" height="100"/>
+    <text class="node-label" x="780" y="388" text-anchor="middle">Transmit</text>
+    <text class="node-sub" x="780" y="406" text-anchor="middle">sendChannel → DoPack</text>
+    <text class="node-sub" x="780" y="422" text-anchor="middle">Write 回 Gateway</text>
+    <text class="node-sub" x="780" y="438" text-anchor="middle">DeliveryMsgBufPool.Put</text>
+
+    <!-- MongoDB -->
+    <rect class="box box-mongo" x="900" y="220" width="80" height="100"/>
+    <text class="node-label" x="940" y="252" text-anchor="middle">Mongo</text>
+    <text class="node-sub" x="940" y="270" text-anchor="middle">R/W分离</text>
+    <text class="node-sub" x="940" y="286" text-anchor="middle">atomic.Ptr</text>
+
+    <!-- 上行路径 -->
+    <path id="d-c2dr" d="M 120 260 Q 140 200 160 130" class="arrow-line" stroke="var(--flow-up)"/>
+    <path id="d-dr2dd" d="M 260 160 L 260 180" class="arrow-line" stroke="var(--flow-up)"/>
+    <path id="d-dd2sl" d="M 360 220 L 410 160" class="arrow-line" stroke="var(--flow-up)"/>
+    <path id="d-sl2bs" d="M 610 160 L 670 130" class="arrow-line" stroke="var(--flow-up)"/>
+    <path id="d-bs2mod" d="M 780 180 L 780 220" class="arrow-line" stroke="var(--flow-up)"/>
+    <path id="d-mod2mongo" d="M 890 270 L 900 270" class="arrow-line" stroke="var(--mongo)"/>
+
+    <!-- 下行 -->
+    <path id="d-mod2tx" d="M 780 320 L 780 360" class="arrow-line" stroke="var(--flow-down)"/>
+    <path id="d-tx2sl2" d="M 670 400 L 610 380" class="arrow-line" stroke="var(--flow-down)"/>
+    <path id="d-sl22dd" d="M 410 380 L 360 250" class="arrow-line" stroke="var(--flow-down)"/>
+    <path id="d-dd2dw" d="M 260 260 L 260 380" class="arrow-line" stroke="var(--flow-down)"/>
+    <path id="d-dw2c" d="M 160 420 Q 140 350 120 280" class="arrow-line" stroke="var(--flow-down)"/>
+
+    <!-- 粒子 上行 -->
+    <circle class="particle pkt-up" r="5"><animateMotion dur="9s" repeatCount="indefinite">
+      <mpath href="#d-c2dr"/></animateMotion></circle>
+    <circle class="particle pkt-up" r="5"><animateMotion dur="9s" repeatCount="indefinite" begin="1s">
+      <mpath href="#d-dr2dd"/></animateMotion></circle>
+    <circle class="particle pkt-up" r="5"><animateMotion dur="9s" repeatCount="indefinite" begin="2s">
+      <mpath href="#d-dd2sl"/></animateMotion></circle>
+    <circle class="particle pkt-up" r="5"><animateMotion dur="9s" repeatCount="indefinite" begin="3s">
+      <mpath href="#d-sl2bs"/></animateMotion></circle>
+    <circle class="particle pkt-up" r="5"><animateMotion dur="9s" repeatCount="indefinite" begin="4s">
+      <mpath href="#d-bs2mod"/></animateMotion></circle>
+    <circle class="particle" fill="var(--mongo)" r="5"><animateMotion dur="9s" repeatCount="indefinite" begin="4.6s">
+      <mpath href="#d-mod2mongo"/></animateMotion></circle>
+
+    <!-- 粒子 下行 -->
+    <circle class="particle pkt-down" r="5"><animateMotion dur="9s" repeatCount="indefinite" begin="5s">
+      <mpath href="#d-mod2tx"/></animateMotion></circle>
+    <circle class="particle pkt-down" r="5"><animateMotion dur="9s" repeatCount="indefinite" begin="5.8s">
+      <mpath href="#d-tx2sl2"/></animateMotion></circle>
+    <circle class="particle pkt-down" r="5"><animateMotion dur="9s" repeatCount="indefinite" begin="6.6s">
+      <mpath href="#d-sl22dd"/></animateMotion></circle>
+    <circle class="particle pkt-down" r="5"><animateMotion dur="9s" repeatCount="indefinite" begin="7.4s">
+      <mpath href="#d-dd2dw"/></animateMotion></circle>
+    <circle class="particle pkt-down" r="5"><animateMotion dur="9s" repeatCount="indefinite" begin="8.2s">
+      <mpath href="#d-dw2c"/></animateMotion></circle>
+  </svg>
+
+  <div class="info">
+    <b>包格式演变：</b><br/>
+    客户端段： <code>[Head 2B 大端 uint16][ProtoNum 2B][Body]</code>，Body ≤ 4096B；<br/>
+    内部段：<code>[Head 2B][SessionID 4B][ProtoNum 2B][Data]</code>，
+    DoPack 在外层加 2B 包体长度，由 <code>ReadStreamBufferObjectWay = 1</code> 决定。<br/>
+    <b>零逃逸内存池：</b> 全程 <code>*[]byte</code> / <code>*ProtoPackInfo</code> 通过 channel 传递，
+    接收方 <code>defer Put</code>，禁止 <code>Put(&amp;localVar)</code>。
+  </div>
+</section>
+
+<!-- ============== 6 协议路由表 + 内存池 ============== -->
+<section id="protocol" class="panel">
+  <h2>⑥ 协议路由表 ProtocolDistributeInfo · 四大 sync.Pool</h2>
+  <div class="row">
+    <div class="col">
+      <h3 style="color:var(--gate); font-size:14px;">路由表结构（运行时只读）</h3>
+      <table>
+        <tr><th>字段</th><th>类型</th><th>作用</th></tr>
+        <tr><td>ProtoNameMap</td><td>map[string]uint16</td><td class="muted">协议名 → 协议号</td></tr>
+        <tr><td>ProtoNumArray</td><td>[MaxUint16]string</td><td class="muted">协议号 → 协议名（O(1)）</td></tr>
+        <tr><td>ProtoDistributeArray</td><td>[MaxUint16]string</td><td class="muted">协议号 → 目标服务（O(1)）</td></tr>
+        <tr><td>ProtocolType</td><td>string</td><td class="muted">json / protobuf</td></tr>
+        <tr><td>ProtoVersion</td><td>string</td><td class="muted">协议版本号</td></tr>
+      </table>
+      <div class="info">
+        定长数组替代 map：热路径 hash 查询 ~10ns → 数组索引 ~0.5ns，每张表内存约 1MB（65535 × 16B string header），进程启动一次性分配。
+      </div>
+
+      <h3 style="color:var(--gate); font-size:14px; margin-top:14px;">SS_ 协议号分段</h3>
+      <table>
+        <tr><th>服务</th><th>起始号</th></tr>
+        <tr><td>modularized_server</td><td>10000</td></tr>
+        <tr><td>interactive_server</td><td>15000</td></tr>
+        <tr><td>web_server</td><td>20000</td></tr>
+        <tr><td>actor_server</td><td>25000</td></tr>
+        <tr><td>gateway_server</td><td>30000</td></tr>
+      </table>
+    </div>
+
+    <div class="col">
+      <h3 style="color:var(--pool); font-size:14px;">四大 sync.Pool（全部 *T 指针）</h3>
+      <div class="module-card" style="border-color:rgba(255,206,92,0.5); background:linear-gradient(135deg, rgba(255,206,92,0.15), rgba(255,159,67,0.05));">
+        <h4 style="color:var(--pool);">DistributeDataPool</h4>
+        <p>位置：<code>gateway_server/distribute.go</code></p>
+        <p>类型：<code>*[]byte</code> cap=5120</p>
+        <p>用途：网关 DoDistribute → SerLinker / writeChan</p>
+      </div>
+      <div class="module-card" style="border-color:rgba(255,206,92,0.5);">
+        <h4 style="color:var(--pool);">DeliveryMsgBufPool</h4>
+        <p>位置：<code>server_common/server_operate.go</code></p>
+        <p>类型：<code>*[]byte</code> cap=5120</p>
+        <p>用途：后端 DeliveryMsg → sendChannel → Transmit</p>
+      </div>
+      <div class="module-card" style="border-color:rgba(255,206,92,0.5);">
+        <h4 style="color:var(--pool);">ProtoPackInfoPool</h4>
+        <p>位置：<code>server_common/server_module.go</code></p>
+        <p>类型：<code>*ProtoPackInfo</code></p>
+        <p>用途：TranspondProtoPack → modChan → HandleProtoPack</p>
+      </div>
+      <div class="module-card" style="border-color:rgba(255,206,92,0.5);">
+        <h4 style="color:var(--pool);">ModulePackInfoPool</h4>
+        <p>位置：<code>server_common/server_module.go</code></p>
+        <p>类型：<code>*ModulePackInfo</code></p>
+        <p>用途：Synchronous/AsynchronousPack2Module</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="info">
+    <b>正确归还模式：</b>
+    <code>bufPtr := pool.Get().(*[]byte)</code> →
+    <code>*bufPtr = (*bufPtr)[:actualLen]</code> →
+    channel 传递 →
+    接收方用毕：<code>*bufPtr = (*bufPtr)[:cap(*bufPtr)]</code> →
+    <code>pool.Put(bufPtr)</code>。
+    ⚠ 禁止 <code>Put(&amp;localVar)</code>，会引发 24B 堆逃逸/次。
+  </div>
+</section>
+
+<!-- ============== 7 常量速查 ============== -->
+<section id="const" class="panel">
+  <h2>⑦ 关键常量速查表</h2>
+  <table>
+    <tr><th>常量</th><th>值</th><th>含义</th></tr>
+    <tr><td>ConnReadBufSize</td><td>4096 B</td><td class="muted">每次 Read 的原始字节缓冲</td></tr>
+    <tr><td>ReadStreamBufferSize</td><td>5120 B</td><td class="muted">池缓冲容量（包体上限 + 余量）</td></tr>
+    <tr><td>MaxPacketBodySize</td><td>4096 B</td><td class="muted">单包体最大值，超出断连</td></tr>
+    <tr><td>MaxPacketsPerRead</td><td>1024</td><td class="muted">一次 Read 最多切出的包数 = CutIndexList 容量</td></tr>
+    <tr><td>ConnWriteChanCaps</td><td>64</td><td class="muted">NewConnection.writeChan 容量</td></tr>
+    <tr><td>channelBufferSize</td><td>1024</td><td class="muted">SerLinker.receiveChannel 容量</td></tr>
+    <tr><td>sendChannelSize</td><td>1024</td><td class="muted">SerConnObj.sendChannel 容量</td></tr>
+    <tr><td>receiveChannelSize</td><td>1024</td><td class="muted">SerConnObj.receiveChannel 容量</td></tr>
+    <tr><td>MaxConnectClientNum</td><td>10000</td><td class="muted">最大客户端并发连接数</td></tr>
+    <tr><td>ConnReadTimeout</td><td>180 s</td><td class="muted">客户端读超时 3 分钟</td></tr>
+    <tr><td>HeadLen</td><td>2 B</td><td class="muted">包头长度（大端 uint16）</td></tr>
+    <tr><td>SessionIdLen</td><td>4 B</td><td class="muted">SessionID 字节长度</td></tr>
+    <tr><td>ProtoNumLen</td><td>2 B</td><td class="muted">协议号字节长度</td></tr>
+    <tr><td>ModCallerTimeOut</td><td>10 s</td><td class="muted">模块同步调用超时</td></tr>
+    <tr><td>TransmitDisposeTickerDuration</td><td>500 ms</td><td class="muted">Transmit/Dispose 连接检测间隔</td></tr>
+    <tr><td>rebuildListenSec</td><td>3 s</td><td class="muted">SerLinker 失败重连间隔</td></tr>
+    <tr><td>maxGateRebuildListenTimes</td><td>—</td><td class="muted">网关重启上限（超过 exit 101）</td></tr>
+  </table>
+
+  <div class="info">
+    <b>关键设计哲学：</b>
+    ① <b>每连接 3 协程（Read / Write / 心跳同步）</b>，每模块 1 协程，全程 channel 通信，最大化降低锁竞争；
+    ② <b>背压非阻塞</b>：写 channel 一律 <code>select/default</code>，满则归还池 + 告警，杜绝雪崩；
+    ③ <b>无锁路由</b>：协议号→服务名用定长数组，热路径 0 hash；
+    ④ <b>零逃逸内存池</b>：4 大 sync.Pool 全使用 <code>*T</code> 指针；
+    ⑤ <b>MongoDB 读写分离</b>：<code>atomic.Pointer[mongo.Client]</code> + 30s 健康检查 Ping，故障重建无锁切换。
+  </div>
+</section>
+
+</main>
+
+<footer>
+  Mixture · 纯 Go 分布式游戏服务器框架 · 动态架构图 · 2026
+</footer>
+
+<script>
+  const tabs = document.querySelectorAll('.tab');
+  const panels = document.querySelectorAll('.panel');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      const target = tab.getAttribute('data-target');
+      panels.forEach(p => p.classList.toggle('active', p.id === target));
+    });
+  });
+
+  let animPaused = {};
+  function toggleAnim(panelId) {
+    const panel = document.getElementById(panelId);
+    if (!panel) return;
+    const svg = panel.querySelector('svg');
+    if (!svg) return;
+    if (animPaused[panelId]) {
+      svg.unpauseAnimations();
+      animPaused[panelId] = false;
+    } else {
+      svg.pauseAnimations();
+      animPaused[panelId] = true;
+    }
+  }
+</script>
+</body>
+</html>
