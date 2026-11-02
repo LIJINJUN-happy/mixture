@@ -30,18 +30,29 @@ func DoSplit(j *ReadStreamBufferObject, byteSlice []byte, readNum int, list *Cut
 }
 
 // 1.根据字节长度来读取数据(注意切割的时候有可能是包头被切割了,需要判断下包头字节问题,除非包头是1字节)
-// 返回 false 表示包头声明的长度超过允许上限，调用方应断开连接
+// 返回 false 表示长度、参数或输出容量非法；调用方必须丢弃本批结果并断开连接。
 func DoSplitByReadHeadLen(j *ReadStreamBufferObject, byteSlice []byte, readNum int, list *CutIndexList, sliceBuffer []byte, beginIdx int) bool {
+	// Read缓冲区可能大于实际数据，所有分支（包括递归）只处理有效字节。
+	if readNum < 0 || readNum > len(byteSlice) || beginIdx < 0 || beginIdx > len(sliceBuffer) {
+		return false
+	}
+	if len(j.headReadArray) > HeadLen || j.curReadLen > j.totalNeedReadLen || len(j.byteData) != int(j.curReadLen) {
+		return false
+	}
+	byteSlice = byteSlice[:readNum]
+	if readNum == 0 {
+		return true
+	}
+
 	if j.totalNeedReadLen == 0 {
-		if len(byteSlice) >= HeadLen {
-			//需要判断包头是否被切割了（不仅仅只考虑包体拼接）
-			diffLen := HeadLen - len(j.headReadArray) //头包剩余所需长度
+		diffLen := HeadLen - len(j.headReadArray) //包头还缺多少字节，而不是总需要多少字节
+		if readNum >= diffLen {
 			j.headReadArray = append(j.headReadArray, byteSlice[:diffLen]...)
 			j.totalNeedReadLen = binary.BigEndian.Uint16(j.headReadArray[:HeadLen])
 
-			// 包长校验：超过上限视为非法包，重置状态并通知断连
-			if j.totalNeedReadLen > MaxPacketBodySize {
-				printer.TextWarn("DoSplitByReadHeadLen", "Oversized packet declared", j.totalNeedReadLen, "limit", MaxPacketBodySize)
+			// 空包无法承载协议号，也不能与“尚未读头”的0状态混用。
+			// 错误由调用方记录并断连。
+			if j.totalNeedReadLen == 0 || j.totalNeedReadLen > MaxPacketBodySize {
 				j.totalNeedReadLen, j.curReadLen = 0, 0
 				j.byteData = j.byteData[0:0]
 				j.headReadArray = j.headReadArray[0:0]
@@ -63,6 +74,10 @@ func DoSplitByReadHeadLen(j *ReadStreamBufferObject, byteSlice []byte, readNum i
 		j.byteData = append(j.byteData, byteSlice...) //剩余的不足够拼成一个完整包（先直接追加进内存等下次Read执行再继续拼接后半段）
 		j.curReadLen += uint16(readNum)
 	} else if readNum >= int(packageNeedLen) {
+		// copy空间不足会静默截断，Push满后会丢包，必须在消费完整包之前检查。
+		if int(j.totalNeedReadLen) > len(sliceBuffer)-beginIdx || list.Len() >= MaxPacketsPerRead {
+			return false
+		}
 		j.byteData = append(j.byteData, byteSlice[:packageNeedLen]...)
 		//printer.TextDebug("newString = " + string(j.byteData))
 		retNum := copy(sliceBuffer[beginIdx:], j.byteData[0:])

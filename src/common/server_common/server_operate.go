@@ -228,7 +228,7 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 	//读取网关发送过来的数据
 	readObj := new(gateway_server.ReadStreamBufferObject)
 	readObj.Init(1) //进程间默认用模式1分割字节数据
-	readBuff, sliceBuffer := make([]byte, gateway_server.ConnReadBufSize), make([]byte, gateway_server.ReadStreamBufferSize)
+	readBuff, sliceBuffer := make([]byte, gateway_server.ConnReadBufSize), make([]byte, int(gateway_server.MaxPacketBodySize)+gateway_server.ConnReadBufSize)
 	var cutList gateway_server.CutIndexList
 	for {
 		num, readError := (*sCoon.gateSerConn).Read(readBuff)
@@ -244,7 +244,10 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 
 		//把读取到的数据发送到处理逻辑通信道中,待注册函数做逻辑处理
 		cutList.Reset()
-		gateway_server.DoSplit(readObj, readBuff[0:], num, &cutList, sliceBuffer)
+		if !gateway_server.DoSplit(readObj, readBuff[0:], num, &cutList, sliceBuffer) {
+			printer.TextWarn("BeginService", "Illegal packet, closing gateway connection", "ServerName", s.ServerName, "ServerId", s.ServerId)
+			return
+		}
 		idx := 0
 		for i := 0; i < cutList.Len(); i++ {
 			elementIDX := cutList.Get(i)

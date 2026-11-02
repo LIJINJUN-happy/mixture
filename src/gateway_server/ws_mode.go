@@ -63,7 +63,7 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 	go DoWriteMsg(newConn)
 
 	//Do Read
-	sliceBuffer := make([]byte, ReadStreamBufferSize)
+	sliceBuffer := make([]byte, int(MaxPacketBodySize)+ConnReadBufSize) //超过输出容量时切包返回false
 	var cutList CutIndexList
 	for {
 		//设置读取的超时时间

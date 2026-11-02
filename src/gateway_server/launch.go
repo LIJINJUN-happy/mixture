@@ -161,7 +161,7 @@ func BeginLinkServer(sl *SerLinker) {
 			byteData:         make([]byte, 0, ReadStreamBufferSize),
 		}
 		serData := make([]byte, ConnReadBufSize)
-		sliceBuffer := make([]byte, ReadStreamBufferSize)
+		sliceBuffer := make([]byte, int(MaxPacketBodySize)+ConnReadBufSize) //上一包残留 + 本次Read
 		var cutList CutIndexList
 
 		//解析xxx服务进程发送来的数据(派发到对应进程的通信道中)
@@ -183,7 +183,10 @@ func BeginLinkServer(sl *SerLinker) {
 				return
 			}
 			//printer.TextInfo("Get Data ", "From ", serLinker.linkerName, "serData", serData[:readNum])
-			DoSplit(rsbObject, serData, readNum, &cutList, sliceBuffer)
+			if !DoSplit(rsbObject, serData, readNum, &cutList, sliceBuffer) {
+				printer.TextWarn("BeginLinkServer", "Illegal packet, closing linker", serLinker.linkerName)
+				return
+			}
 
 			//派发到对应的通信道中(来自其他服务所以sourceSessionID为0，标识不是来自客户端发送来的协议数据)
 			DoDistribute(&cutList, sliceBuffer, 0)

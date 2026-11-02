@@ -110,7 +110,7 @@ func DoReadMsg(newConn *NewConnection) {
 		clientReadGoroutineNum.Add(-1) //读协程数量同步变动减少
 	}()
 
-	sliceBuffer := make([]byte, ReadStreamBufferSize)
+	sliceBuffer := make([]byte, int(MaxPacketBodySize)+ConnReadBufSize) //上一包残留 + 本次Read
 	var cutList CutIndexList
 	for {
 		//设置下次读取的超时时间
