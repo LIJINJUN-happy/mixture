@@ -151,9 +151,13 @@ func init() {
 	} else {
 		allProtoPath = "./proto/mutual_json/json_src/allprotocol.json"
 	}
-	data, err := os.ReadFile(allProtoPath)
+	resolvedProtoPath, err := tools.ResolveFilePath(allProtoPath)
 	if err != nil {
 		panic("allprotocol.json read fail, allProtoPath:" + allProtoPath)
+	}
+	data, err := os.ReadFile(resolvedProtoPath)
+	if err != nil {
+		panic("allprotocol.json read fail, resolvedProtoPath:" + resolvedProtoPath)
 	}
 
 	//获取版本号（用于和前端区分协议版本）

@@ -3,12 +3,43 @@ package tools
 import (
 	"bufio"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 )
 
+func ResolveFilePath(fileName string) (string, error) {
+	if filepath.IsAbs(fileName) {
+		_, err := os.Stat(fileName)
+		return fileName, err
+	}
+	if _, err := os.Stat(fileName); err == nil {
+		return fileName, nil
+	}
+	workingDir, err := os.Getwd()
+	if err != nil {
+		return fileName, err
+	}
+	relativePath := filepath.Clean(fileName)
+	var lastErr error
+	for dir := workingDir; ; dir = filepath.Dir(dir) {
+		candidate := filepath.Join(dir, relativePath)
+		if _, lastErr = os.Stat(candidate); lastErr == nil {
+			return candidate, nil
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return fileName, lastErr
+		}
+	}
+}
+
 func ReadFileByName(fileName string) (*bufio.Scanner, *os.File) {
-	f, e := os.Open(fileName)
+	resolvedPath, e := ResolveFilePath(fileName)
+	if e != nil {
+		return nil, nil
+	}
+	f, e := os.Open(resolvedPath)
 	if e != nil {
 		return nil, nil
 	}
