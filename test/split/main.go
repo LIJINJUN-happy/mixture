@@ -1,11 +1,45 @@
-package test
+package main
 
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	gate "mixture/src/gateway_server"
-	"testing"
+	"os"
 )
+
+// 用轻量断言器保留原来 17 个测试场景，同时允许直接 go run。
+type caseT struct{}
+type failure string
+
+var total, failed int
+
+func (*caseT) Helper()                           {}
+func (*caseT) Fatal(args ...any)                 { panic(failure(fmt.Sprint(args...))) }
+func (*caseT) Fatalf(format string, args ...any) { panic(failure(fmt.Sprintf(format, args...))) }
+
+func (*caseT) Run(name string, fn func(*caseT)) (ok bool) {
+	total++
+	defer func() {
+		if p := recover(); p != nil {
+			failed++
+			fmt.Printf("FAIL %s: %v\n", name, p)
+			ok = false
+		} else {
+			fmt.Printf("PASS %s\n", name)
+		}
+	}()
+	fn(&caseT{})
+	return true
+}
+
+func main() {
+	TestDoSplitByReadHeadLen17Scenarios(&caseT{})
+	fmt.Printf("切包测试：%d 个场景，通过 %d 个，失败 %d 个\n", total, total-failed, failed)
+	if failed > 0 {
+		os.Exit(1)
+	}
+}
 
 func makePacket(body []byte) []byte {
 	packet := make([]byte, gate.HeadLen+len(body))
@@ -21,7 +55,7 @@ func newStream() *gate.ReadStreamBufferObject {
 }
 
 // splitChunks 模拟TCP固定读缓冲：未读区域填充旧数据，readNum表示本次有效长度。
-func splitChunks(t *testing.T, chunks ...[]byte) ([][]byte, bool) {
+func splitChunks(t *caseT, chunks ...[]byte) ([][]byte, bool) {
 	t.Helper()
 	stream := newStream()
 	readBuffer := make([]byte, gate.ConnReadBufSize)
@@ -55,7 +89,7 @@ func splitChunks(t *testing.T, chunks ...[]byte) ([][]byte, bool) {
 	return packets, true
 }
 
-func requirePackets(t *testing.T, got [][]byte, want ...[]byte) {
+func requirePackets(t *caseT, got [][]byte, want ...[]byte) {
 	t.Helper()
 	if len(got) != len(want) {
 		t.Fatalf("packet count=%d, want=%d", len(got), len(want))
@@ -67,7 +101,7 @@ func requirePackets(t *testing.T, got [][]byte, want ...[]byte) {
 	}
 }
 
-func requireProtocolBodyLength(t *testing.T, body []byte, min, max int, wantValid bool) {
+func requireProtocolBodyLength(t *caseT, body []byte, min, max int, wantValid bool) {
 	t.Helper()
 	valid := len(body) >= min && len(body) <= max
 	if valid != wantValid {
@@ -75,13 +109,13 @@ func requireProtocolBodyLength(t *testing.T, body []byte, min, max int, wantVali
 	}
 }
 
-func TestDoSplitByReadHeadLen17Scenarios(t *testing.T) {
+func TestDoSplitByReadHeadLen17Scenarios(t *caseT) {
 	body1 := []byte{0, 1, 'a', 'b'}
 	body2 := []byte{0, 2, 'c'}
 	p1 := makePacket(body1)
 	p2 := makePacket(body2)
 
-	t.Run("01_完整单包", func(t *testing.T) {
+	t.Run("01_完整单包", func(t *caseT) {
 		got, ok := splitChunks(t, p1)
 		if !ok {
 			t.Fatal("split returned false")
@@ -89,7 +123,7 @@ func TestDoSplitByReadHeadLen17Scenarios(t *testing.T) {
 		requirePackets(t, got, body1)
 	})
 
-	t.Run("02_包头按1加1拆分", func(t *testing.T) {
+	t.Run("02_包头按1加1拆分", func(t *caseT) {
 		got, ok := splitChunks(t, p1[:1], p1[1:2], p1[2:])
 		if !ok {
 			t.Fatal("split returned false")
@@ -97,7 +131,7 @@ func TestDoSplitByReadHeadLen17Scenarios(t *testing.T) {
 		requirePackets(t, got, body1)
 	})
 
-	t.Run("03_包体跨多次Read", func(t *testing.T) {
+	t.Run("03_包体跨多次Read", func(t *caseT) {
 		got, ok := splitChunks(t, p1[:3], p1[3:4], p1[4:])
 		if !ok {
 			t.Fatal("split returned false")
@@ -105,7 +139,7 @@ func TestDoSplitByReadHeadLen17Scenarios(t *testing.T) {
 		requirePackets(t, got, body1)
 	})
 
-	t.Run("04_两个完整包粘在一起", func(t *testing.T) {
+	t.Run("04_两个完整包粘在一起", func(t *caseT) {
 		got, ok := splitChunks(t, append(bytes.Clone(p1), p2...))
 		if !ok {
 			t.Fatal("split returned false")
@@ -113,7 +147,7 @@ func TestDoSplitByReadHeadLen17Scenarios(t *testing.T) {
 		requirePackets(t, got, body1, body2)
 	})
 
-	t.Run("05_前一个包半包后接剩余包体和下一包", func(t *testing.T) {
+	t.Run("05_前一个包半包后接剩余包体和下一包", func(t *caseT) {
 		joined := append(bytes.Clone(p1), p2...)
 		got, ok := splitChunks(t, joined[:3], joined[3:])
 		if !ok {
@@ -122,7 +156,7 @@ func TestDoSplitByReadHeadLen17Scenarios(t *testing.T) {
 		requirePackets(t, got, body1, body2)
 	})
 
-	t.Run("06_固定4096字节TCP缓冲但readNum等于1", func(t *testing.T) {
+	t.Run("06_固定4096字节TCP缓冲但readNum等于1", func(t *caseT) {
 		stream := newStream()
 		readBuffer := bytes.Repeat([]byte{0xEE}, gate.ConnReadBufSize)
 		readBuffer[0] = p1[0]
@@ -144,7 +178,7 @@ func TestDoSplitByReadHeadLen17Scenarios(t *testing.T) {
 		}
 	})
 
-	t.Run("07_4096字节大残包完成后紧跟4093字节包", func(t *testing.T) {
+	t.Run("07_4096字节大残包完成后紧跟4093字节包", func(t *caseT) {
 		bodyA := bytes.Repeat([]byte{0xA1}, int(gate.MaxPacketBodySize))
 		bodyB := bytes.Repeat([]byte{0xB2}, 4093)
 		packetA := makePacket(bodyA)
@@ -157,7 +191,7 @@ func TestDoSplitByReadHeadLen17Scenarios(t *testing.T) {
 		requirePackets(t, got, bodyA, bodyB)
 	})
 
-	t.Run("08_客户端最小长度2", func(t *testing.T) {
+	t.Run("08_客户端最小长度2", func(t *caseT) {
 		body := []byte{0, 1}
 		got, ok := splitChunks(t, makePacket(body))
 		if !ok {
@@ -167,7 +201,7 @@ func TestDoSplitByReadHeadLen17Scenarios(t *testing.T) {
 		requireProtocolBodyLength(t, got[0], gate.ProtoNumLen, int(gate.MaxPacketBodySize), true)
 	})
 
-	t.Run("09_客户端长度1被协议层拒绝", func(t *testing.T) {
+	t.Run("09_客户端长度1被协议层拒绝", func(t *caseT) {
 		body := []byte{1}
 		got, ok := splitChunks(t, makePacket(body))
 		if !ok {
@@ -177,7 +211,7 @@ func TestDoSplitByReadHeadLen17Scenarios(t *testing.T) {
 		requireProtocolBodyLength(t, got[0], gate.ProtoNumLen, int(gate.MaxPacketBodySize), false)
 	})
 
-	t.Run("10_客户端最大长度4092", func(t *testing.T) {
+	t.Run("10_客户端最大长度4092", func(t *caseT) {
 		body := bytes.Repeat([]byte{0xA0}, int(gate.MaxPacketBodySize)-gate.SessionIdLen)
 		body[0], body[1] = 0, 1
 		got, ok := splitChunks(t, makePacket(body))
@@ -188,7 +222,7 @@ func TestDoSplitByReadHeadLen17Scenarios(t *testing.T) {
 		requireProtocolBodyLength(t, got[0], gate.ProtoNumLen, int(gate.MaxPacketBodySize)-gate.SessionIdLen, true)
 	})
 
-	t.Run("11_客户端长度4093被协议层拒绝", func(t *testing.T) {
+	t.Run("11_客户端长度4093被协议层拒绝", func(t *caseT) {
 		body := bytes.Repeat([]byte{0xA1}, int(gate.MaxPacketBodySize)-gate.SessionIdLen+1)
 		got, ok := splitChunks(t, makePacket(body))
 		if !ok {
@@ -198,7 +232,7 @@ func TestDoSplitByReadHeadLen17Scenarios(t *testing.T) {
 		requireProtocolBodyLength(t, got[0], gate.ProtoNumLen, int(gate.MaxPacketBodySize)-gate.SessionIdLen, false)
 	})
 
-	t.Run("12_内部最小长度6", func(t *testing.T) {
+	t.Run("12_内部最小长度6", func(t *caseT) {
 		body := []byte{0, 0, 0, 1, 0, 2}
 		got, ok := splitChunks(t, makePacket(body))
 		if !ok {
@@ -208,7 +242,7 @@ func TestDoSplitByReadHeadLen17Scenarios(t *testing.T) {
 		requireProtocolBodyLength(t, got[0], gate.SessionIdLen+gate.ProtoNumLen, int(gate.MaxPacketBodySize), true)
 	})
 
-	t.Run("13_内部长度5被协议层拒绝", func(t *testing.T) {
+	t.Run("13_内部长度5被协议层拒绝", func(t *caseT) {
 		body := []byte{0, 0, 0, 1, 0}
 		got, ok := splitChunks(t, makePacket(body))
 		if !ok {
@@ -218,7 +252,7 @@ func TestDoSplitByReadHeadLen17Scenarios(t *testing.T) {
 		requireProtocolBodyLength(t, got[0], gate.SessionIdLen+gate.ProtoNumLen, int(gate.MaxPacketBodySize), false)
 	})
 
-	t.Run("14_内部最大长度4096", func(t *testing.T) {
+	t.Run("14_内部最大长度4096", func(t *caseT) {
 		body := bytes.Repeat([]byte{0xB0}, int(gate.MaxPacketBodySize))
 		packet := makePacket(body)
 		got, ok := splitChunks(t, packet[:gate.ConnReadBufSize], packet[gate.ConnReadBufSize:])
@@ -229,14 +263,14 @@ func TestDoSplitByReadHeadLen17Scenarios(t *testing.T) {
 		requireProtocolBodyLength(t, got[0], gate.SessionIdLen+gate.ProtoNumLen, int(gate.MaxPacketBodySize), true)
 	})
 
-	t.Run("15_readNum超过输入切片长度", func(t *testing.T) {
+	t.Run("15_readNum超过输入切片长度", func(t *caseT) {
 		var list gate.CutIndexList
 		if gate.DoSplit(newStream(), []byte{0, 2}, 3, &list, make([]byte, 32)) {
 			t.Fatal("invalid readNum was accepted")
 		}
 	})
 
-	t.Run("16_输出缓冲不足", func(t *testing.T) {
+	t.Run("16_输出缓冲不足", func(t *caseT) {
 		var list gate.CutIndexList
 		packet := makePacket([]byte{0, 1, 'x'})
 		if gate.DoSplit(newStream(), packet, len(packet), &list, make([]byte, 2)) {
@@ -244,7 +278,7 @@ func TestDoSplitByReadHeadLen17Scenarios(t *testing.T) {
 		}
 	})
 
-	t.Run("17_单批超过1024个包", func(t *testing.T) {
+	t.Run("17_单批超过1024个包", func(t *caseT) {
 		packet := makePacket([]byte{0, 1})
 		input := bytes.Repeat(packet, gate.MaxPacketsPerRead+1)
 		var list gate.CutIndexList
