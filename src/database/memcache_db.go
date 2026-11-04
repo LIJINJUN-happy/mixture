@@ -10,11 +10,13 @@ import (
 )
 
 /*缓存数据处理逻辑*/
-var cache atomic.Pointer[memcache.Client]
-var cacheDBAddr string
-var cacheDBPort string
-var cacheItemExpiration int32 = 60 * 15   //CacheItem 有效时长（单位：秒）
-var cacheTimeOut = 500 * time.Millisecond //操作超时时长
+var (
+	cache               atomic.Pointer[memcache.Client]
+	cacheDBAddr         string
+	cacheDBPort         string
+	cacheItemExpiration int32 = 60 * 15                //CacheItem 有效时长（单位：秒）
+	cacheTimeOut              = 500 * time.Millisecond //操作超时时长
+)
 
 func MemCacheConnectClientInit(serName, processId string) {
 	if serName != "robot_test" && serName != "gateway_server" {

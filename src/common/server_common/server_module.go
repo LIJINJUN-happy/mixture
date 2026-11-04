@@ -11,10 +11,12 @@ import (
 )
 
 // 服务进程内的模块Map容器定义(每个进程服务用于存储各自的不同模块)
-var ModCallerTimeOut = 10 * time.Second                      //最大模块调用超时时长
-var ServerModMgr = new(sync.Map)                             //服务进程模块容器（key:模块名,val:模块对象指针）
-var ProtoName2ModMap = make(map[string]chan interface{})     //协议模块映射表（key:协议名,val:模块通道chan）
-var InterfaceName2ModMap = make(map[string]chan interface{}) //外部接口模块映射表（key:外部接口名,val:模块通道chan）
+var (
+	ModCallerTimeOut     = 10 * time.Second                  //最大模块调用超时时长
+	ServerModMgr         = new(sync.Map)                     //服务进程模块容器（key:模块名,val:模块对象指针）
+	ProtoName2ModMap     = make(map[string]chan interface{}) //协议模块映射表（key:协议名,val:模块通道chan）
+	InterfaceName2ModMap = make(map[string]chan interface{}) //外部接口模块映射表（key:外部接口名,val:模块通道chan）
+)
 
 // 服务模块
 type ServerModule struct {

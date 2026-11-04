@@ -19,9 +19,11 @@ import (
 	"time"
 )
 
-const sendChannelSize = 1024
-const receiveChannelSize = 1024
-const TransmitDisposeTickerDuration = time.Millisecond * 500
+const (
+	sendChannelSize               = 1024
+	receiveChannelSize            = 1024
+	TransmitDisposeTickerDuration = time.Millisecond * 500
+)
 
 // 通用服务指针（创建服务器结构体对象后赋值其地址给该指针）
 var ServicePrt *ServerInfo
