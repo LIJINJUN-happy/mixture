@@ -81,12 +81,10 @@ func DoLoggerInit(serName string) {
 		logName = serName //机器人服务进程就按原本的命名
 	} else {
 		panic("logName Init Fail")
-		return
 	}
 	l := printer.CreateLogger(logName, "log/", true)
 	if l == nil {
 		panic("Happen Error With Creating Server LoggerObj")
-		return
 	}
 	printer.SetLoggerObj(l)
 }
