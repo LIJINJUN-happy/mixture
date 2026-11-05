@@ -28,7 +28,7 @@
 ## 开发环境
 
 - Linux Kernel：Linux version 3.10.0-1160.108.1.el7.x86_64 | CentOS 7.9
-- Golang 版本：go1.22.4（版本过低不支持内置 slog 库）
+- Go 版本：Go 1.23（项目 `go.mod` 的最低版本要求）
 - SQLite 版本：SQLite-3.46.0
 - MemCacheDB 版本：Memcached-1.4.15
 - MongoDB 版本：7.0.20
