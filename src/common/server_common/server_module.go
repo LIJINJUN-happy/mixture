@@ -3,6 +3,7 @@ package server_common
 import (
 	"errors"
 	"mixture/src/common/printer"
+	"mixture/src/gateway_server"
 	"os"
 	"os/signal"
 	"sync"
@@ -46,10 +47,10 @@ var ModulePackInfoPool = sync.Pool{
 
 // 传输给模块通道的协议数据包（来自别的进程分发以及客户端传输）
 type ProtoPackInfo struct {
-	ProName   string //协议名字
-	Data      []byte //协议数据内容
-	GateId    int    //来着哪个网关进程
-	SessionID uint32 //玩家标识
+	ProName   string  //协议名字
+	Data      *[]byte //协议数据内容
+	GateId    int     //来着哪个网关进程
+	SessionID uint32  //玩家标识
 }
 
 // 传输给模块通道的模块数据包（来自同的进程下不同模块的调用数据传输）
@@ -138,11 +139,20 @@ func (mod *ServerModule) HandleProtoPack(protoPack *ProtoPackInfo) {
 			printer.TextError("HandleProtoPack", "ServerName", ServicePrt.ServerName, "ServerId", ServicePrt.ServerId, "modName", mod.modName, "Error", err)
 		}
 
+		//执行完毕后把协议数据包内的Data放回内存池（需在ProtoPackInfoPool前处理）
+		if protoPack.Data != nil {
+			bufPtr := protoPack.Data
+			*bufPtr = (*bufPtr)[:cap(*bufPtr)]
+			ReceivePacketBufPool.Put(bufPtr)
+			protoPack.Data = nil
+		}
+
 		// 协议数据包放回对象池，减少每次都new新包的开销
 		ProtoPackInfoPool.Put(protoPack)
 	}()
 	if callFunc, res := mod.HandleFuncMap[protoPack.ProName]; res {
-		callFunc(protoPack.Data, protoPack.GateId, protoPack.SessionID)
+		dataIdxFrom := gateway_server.ProtoNumLen + gateway_server.SessionIdLen
+		callFunc((*protoPack.Data)[dataIdxFrom:], protoPack.GateId, protoPack.SessionID)
 	} else {
 		printer.TextError("ModCall", "ServerName", ServicePrt.ServerName, "ServerId", ServicePrt.ServerId, "MissCallProto", protoPack.ProName)
 	}

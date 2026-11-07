@@ -37,7 +37,7 @@ type ServerInfo struct {
 	listenObj           *net.Listener                      //监听对象
 	mux                 sync.RWMutex                       //SerConnObj集合读写锁(防止多个协程同时修改connObjMap)
 	connObjMap          map[int]*SerConnObj                //用于存放SerConnObj对象指针的集合
-	DisposeFunc         func([]byte, string, int, uint32)  //提供一个接口来处理接收到来的数据,参数：协议数据,协议名字,发送信息过来的gateID,用户的SessionID（可以有可以没有）
+	DisposeFunc         func(*[]byte, string, int, uint32) //提供一个接口来处理接收到来的数据,参数：协议数据,协议名字,发送信息过来的gateID,用户的SessionID（可以有可以没有）
 	ServerHandleFuncMap map[string]func(data []byte) error //服务处理函数集
 }
 
@@ -150,16 +150,16 @@ func (s *ServerInfo) DeleteConnObj(gateAddr string, gateId int) {
 	}
 }
 
-func (s *ServerInfo) SetDisposeFunc(f func([]byte, string, int, uint32)) {
+func (s *ServerInfo) SetDisposeFunc(f func(*[]byte, string, int, uint32)) {
 	s.DisposeFunc = f
 }
 
-func (s *ServerInfo) GetDisposeFunc() func([]byte, string, int, uint32) {
+func (s *ServerInfo) GetDisposeFunc() func(*[]byte, string, int, uint32) {
 	return s.DisposeFunc
 }
 
 // 注册服务监视逻辑，所有连接到该服务进程的Gate的协议数据包都通过f函数处理
-func (s *ServerInfo) RegisterMonitorLogic(f func([]byte, string, int, uint32)) {
+func (s *ServerInfo) RegisterMonitorLogic(f func(*[]byte, string, int, uint32)) {
 	serName := s.ServerName
 	serId := s.ServerId
 	port, address := strconv.Itoa(s.GetPort()), s.GetAddress()
@@ -324,7 +324,6 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
 	}(sCoon)
 
 	//收取通信道传输过来切割好的数据包内容
-	dataIdxFrom := gateway_server.ProtoNumLen + gateway_server.SessionIdLen
 	fun := s.GetDisposeFunc()
 	for {
 		select {
@@ -341,10 +340,11 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
 			if (protoNum > 0) && (sCoon.gateId > 0) {
 				//已经标识了对应的网关并识别到对应的协议号后，直接调用协议处理函数
 				protoName := gateway_server.ProtocolDistributeInfo.ProtoNumArray[protoNum]
-				fun(dataSlice[dataIdxFrom:], protoName, sCoon.gateId, sessionId)
+				fun(receiveData, protoName, sCoon.gateId, sessionId)
 			} else if (protoNum == 0) && (sCoon.gateId < 0) {
 				gateID := -1
 				linkerName := ""
+				dataIdxFrom := gateway_server.ProtoNumLen + gateway_server.SessionIdLen
 				if gateway_server.ProtocolDistributeInfo.ProtocolType == "protobuf" {
 					gatePbStruct := new(ipb.GateIdSyncInfo)
 					errUnmarshal := proto.Unmarshal(dataSlice[dataIdxFrom:], gatePbStruct)
@@ -377,9 +377,9 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
 					(*ptr).Close()
 					printer.TextError("Dispose SYN GateId", "From GateLinker", linkerName, "Already Exist GateID", gateID)
 				}
+				*receiveData = (*receiveData)[:cap(*receiveData)]
+				ReceivePacketBufPool.Put(receiveData)
 			}
-			*receiveData = (*receiveData)[:cap(*receiveData)]
-			ReceivePacketBufPool.Put(receiveData)
 		}
 	}
 }
@@ -393,18 +393,8 @@ func (s *ServerInfo) RegisterServerHandleFunc(protocol string, handleFunc func(d
 	s.ServerHandleFuncMap[protocol] = handleFunc
 }
 
-// 尝试调用进程服务响应函数方法
-func (s *ServerInfo) TryCallServerFunc(data []byte, proName string) {
-	if serverFunc, searchRes := s.ServerHandleFuncMap[proName]; searchRes {
-		err := serverFunc(data)
-		if err != nil {
-			printer.TextError("ServerHandleFuncMap Err", "proName", proName, "ErrString", err.Error())
-		}
-	}
-}
-
 // 打包协议数据到对应的模块通道或者是执行服务处理逻辑
-func TranspondProtoPack(data []byte, proName string, gateId int, sessionID uint32) {
+func TranspondProtoPack(data *[]byte, proName string, gateId int, sessionID uint32) {
 	//printer.TextInfo("TranspondProtoPack", "proName", proName, "gateId", gateId, "sessionID", sessionID, "data", string(data))
 	if modChan, ok := ProtoName2ModMap[proName]; ok {
 		info := ProtoPackInfoPool.Get().(*ProtoPackInfo)
@@ -418,6 +408,22 @@ func TranspondProtoPack(data []byte, proName string, gateId int, sessionID uint3
 
 	//尝试执行是否为服务函数（非模块函数）
 	ServicePrt.TryCallServerFunc(data, proName)
+}
+
+// 尝试调用进程服务响应函数方法
+func (s *ServerInfo) TryCallServerFunc(data *[]byte, proName string) {
+	defer func() {
+		*data = (*data)[:cap(*data)]
+		ReceivePacketBufPool.Put(data)
+	}()
+
+	if serverFunc, searchRes := s.ServerHandleFuncMap[proName]; searchRes {
+		dataIdxFrom := gateway_server.ProtoNumLen + gateway_server.SessionIdLen
+		err := serverFunc((*data)[dataIdxFrom:])
+		if err != nil {
+			printer.TextError("ServerHandleFuncMap Err", "proName", proName, "ErrString", err.Error())
+		}
+	}
 }
 
 // 该协议用于发送服务中的协议返回gate进程处理,参数①发送目标网关的ID,②sessionId(非发送给客户端可以为0否者必须指定sessionID),③协议名字,④数据内容
