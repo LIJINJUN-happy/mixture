@@ -204,17 +204,28 @@ func (mod *ServerModule) RegisterInterfaceHandleCaller(interfaceName string, int
 func SynchronousPack2Module(modName string, interfaceFuncName string, args []any) interface{} {
 	if sm, ok := ServerModMgr.Load(modName); ok {
 		if mod, res := sm.(*ServerModule); res {
+			timer := time.NewTimer(ModCallerTimeOut) // 入队和等待结果共用一个超时预算。
+			defer timer.Stop()
+			returnChan := make(chan interface{}, 1)
+
+			//创建模块包对象并发送到模块通道
 			info := ModulePackInfoPool.Get().(*ModulePackInfo)
 			info.InterfaceName = interfaceFuncName
 			info.ArgsList = args
-			info.ReturnChan = make(chan interface{}, 1)
-			mod.receiptChan <- info
+			info.ReturnChan = returnChan
+			select {
+			case mod.receiptChan <- info: // 所有权已交给模块，此后不能再访问或回收info
+			case <-timer.C:
+				info.ArgsList = nil
+				info.ReturnChan = nil
+				ModulePackInfoPool.Put(info)
+				printer.TextError("SynchronousPack2Module_EnqueueTimeOut", "ModName", modName, "CallFunc", interfaceFuncName)
+				return nil
+			}
 
 			//开始等待同步调用的数据返回
-			timer := time.NewTimer(ModCallerTimeOut)
-			defer timer.Stop()
 			select {
-			case retData := <-info.ReturnChan:
+			case retData := <-returnChan:
 				return retData
 			case <-timer.C:
 				printer.TextError("SynchronousPack2Module_TimeOut", "ModName", modName, "CallFunc", interfaceFuncName, "CallArgs", args)
