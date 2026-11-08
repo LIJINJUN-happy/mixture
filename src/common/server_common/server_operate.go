@@ -124,29 +124,32 @@ func (s *ServerInfo) GetConnObj(gateID int) *SerConnObj {
 }
 
 // 添加gate连接对象，并返回添加后集合最新长度
+// Reject duplicate IDs and registration after Close.
 func (s *ServerInfo) AddConnObj(c *SerConnObj) int {
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	s.connObjMap[c.gateId] = c
-	printer.TextInfo("AddConnObj New Gate Connect Success", "RemoteAddr", (*c).GetGateIPAddr())
+	c.closeMux.Lock()
+	defer c.closeMux.Unlock()
+	if c.closed {
+		return -1
+	}
+
+	//检测一下是否存已存在对应的网关ID标识，不可重复，需要保证唯一ID标识
+	id := c.GetGateId()
+	if _, exists := s.connObjMap[id]; exists {
+		return -1
+	}
+	s.connObjMap[id] = c
 	return len(s.connObjMap)
 }
 
-// 移除来自gateWay的连接对象
-func (s *ServerInfo) DeleteConnObj(gateAddr string, gateId int) {
+func (s *ServerInfo) DeleteConnObj(c *SerConnObj) {
+	c.Close("DeleteConnObj")
 	s.mux.Lock()
 	defer s.mux.Unlock()
-	if obj, ok := s.connObjMap[gateId]; ok {
-		if (obj.GetGateIPAddr() == gateAddr) && (obj.GetGateId() == gateId) {
-			//关闭通信道
-			close(obj.sendChannel)
-			close(obj.receiveChannel)
-
-			//关闭socket, 并从连接链中移除连接对象
-			obj.Close("DeleteConnObj")
-			delete(s.connObjMap, gateId)
-			printer.TextInfo("DeleteConnObj", "RemoteGateId", gateId, "Addr", gateAddr, "After DeleteConnObj Size", len(s.connObjMap))
-		}
+	id := c.GetGateId()
+	if s.connObjMap[id] == c {
+		delete(s.connObjMap, id)
 	}
 }
 
@@ -216,7 +219,7 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 		if r := recover(); r != nil {
 			printer.PanicStack(r)
 		}
-		si.DeleteConnObj(sObj.gateAddr, sObj.GetGateId())
+		si.DeleteConnObj(sObj)
 		printer.TextInfo("BeginService Goroutine End........")
 	}(s, sCoon)
 
@@ -262,10 +265,7 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 				}
 				*bufPtr = (*bufPtr)[:packetLen]
 				copy(*bufPtr, sliceBuffer[idx:elementIDX])
-				select {
-				case sCoon.receiveChannel <- bufPtr:
-				default:
-					//非阻塞写：满则丢包并打告警,避免下游慢导致整条网关连接被断开引发雪崩
+				if !sCoon.TryEnqueue(sCoon.receiveChannel, bufPtr) {
 					*bufPtr = (*bufPtr)[:cap(*bufPtr)]
 					ReceivePacketBufPool.Put(bufPtr)
 					printer.TextWarn("BeginService", "Err", "receiveChannel Full", "ServerName", s.ServerName, "ServerId", s.ServerId, "GateId", sCoon.GetGateId())
@@ -282,6 +282,7 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj, ctx context.Context) {
 			printer.PanicStack(r)
 		}
 		s.Close("Transmit")
+		DrainConnQueue(s.sendChannel, &DeliveryMsgBufPool)
 		printer.TextInfo("Transmit Goroutine End........")
 	}(sCoon)
 
@@ -289,6 +290,8 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj, ctx context.Context) {
 	dataSlice := make([]byte, gateway_server.ReadStreamBufferSize)
 	for {
 		select {
+		case <-sCoon.closeSign:
+			return
 		case <-ctx.Done(): //连接已关闭，退出发送协程
 			return
 		case bufPtr, ok := <-sCoon.sendChannel:
@@ -320,6 +323,7 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
 			printer.PanicStack(r)
 		}
 		s.Close("Dispose")
+		DrainConnQueue(s.receiveChannel, &ReceivePacketBufPool)
 		printer.TextInfo("Dispose Goroutine End........")
 	}(sCoon)
 
@@ -327,6 +331,8 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
 	fun := s.GetDisposeFunc()
 	for {
 		select {
+		case <-sCoon.closeSign:
+			return
 		case <-ctx.Done(): //连接已关闭，退出接收协程
 			return
 		case receiveData, ok := <-sCoon.receiveChannel:
@@ -337,11 +343,11 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
 			sessionId := binary.BigEndian.Uint32(dataSlice)
 			protoNum := binary.BigEndian.Uint16(dataSlice[gateway_server.SessionIdLen:])
 			//printer.TextInfo("dispose receiveData", "receiveData := <-sCoon.receiveChannel", dataSlice, "sessionId", sessionId)
-			if (protoNum > 0) && (sCoon.gateId > 0) {
+			if (protoNum > 0) && (sCoon.GetGateId() > 0) {
 				//已经标识了对应的网关并识别到对应的协议号后，直接调用协议处理函数
 				protoName := gateway_server.ProtocolDistributeInfo.ProtoNumArray[protoNum]
-				fun(receiveData, protoName, sCoon.gateId, sessionId)
-			} else if (protoNum == 0) && (sCoon.gateId < 0) {
+				fun(receiveData, protoName, sCoon.GetGateId(), sessionId)
+			} else if (protoNum == 0) && (sCoon.GetGateId() < 0) {
 				gateID := -1
 				linkerName := ""
 				dataIdxFrom := gateway_server.ProtoNumLen + gateway_server.SessionIdLen
@@ -365,17 +371,14 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
 					linkerName = jsStruct.SerName
 				}
 
-				//检测一下是否存已存在对应的网关ID标识，不可重复，需要保证唯一ID标识
-				if !s.CheckConnObjIsExist(gateID) {
-					sCoon.SetGateId(gateID) //设置网关标识
-					curGateSize := s.AddConnObj(sCoon)
+				sCoon.SetGateId(gateID)
+				if curGateSize := s.AddConnObj(sCoon); curGateSize >= 0 {
 					printer.TextInfo("Dispose SYN GateId", "From GateLinker", linkerName, "GateID", gateID, "ConnObjMapSize", curGateSize)
 				} else {
-					//否者直接断开连接
-					ptr := sCoon.gateSerConn
-					sCoon.gateSerConn = nil
-					(*ptr).Close()
-					printer.TextError("Dispose SYN GateId", "From GateLinker", linkerName, "Already Exist GateID", gateID)
+					sCoon.Close("DuplicateOrClosedGate")
+					*receiveData = (*receiveData)[:cap(*receiveData)]
+					ReceivePacketBufPool.Put(receiveData)
+					return
 				}
 				*receiveData = (*receiveData)[:cap(*receiveData)]
 				ReceivePacketBufPool.Put(receiveData)
@@ -447,10 +450,8 @@ func DeliveryMsg(gateID int, sessionId uint32, protoName string, data []byte) {
 		if n := copy(sendDataBuf[gateway_server.SessionIdLen+gateway_server.ProtoNumLen:], data); n == dataLen {
 			*bufPtr = sendDataBuf // 缩切到实际数据长度，接收端 *bufPtr 即为有效数据
 			//非阻塞写，避免 gateway 慢时阻塞模块协程
-			select {
-			case gateConn.GetSendChannel() <- bufPtr:
-			default:
-				printer.TextWarn("DeliveryMsg SendChannel Full, Drop msg", "GateID", gateID, "protoName", protoName, "sessionId", sessionId)
+			if !gateConn.TrySend(bufPtr) {
+				printer.TextWarn("DeliveryMsg Connection Closed Or Queue Full, Drop msg", "GateID", gateID, "protoName", protoName, "sessionId", sessionId)
 				DeliveryMsgBufPool.Put(bufPtr)
 			}
 		} else {

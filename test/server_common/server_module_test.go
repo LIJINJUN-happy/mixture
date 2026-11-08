@@ -3,6 +3,7 @@ package server_common_test
 import (
 	"mixture/src/common/printer"
 	sc "mixture/src/common/server_common"
+	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -108,4 +109,44 @@ func withModule(t *testing.T, name string, size int, fn func(...any) interface{}
 		delete(sc.InterfaceName2ModMap, "noop")
 	}()
 	run()
+}
+
+func TestConnectionCloseAndSend(t *testing.T) {
+	local, remote := net.Pipe()
+	defer remote.Close()
+	conn := new(sc.SerConnObj)
+	if err := conn.Init(&local); err != nil {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	for i := 0; i < 16; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for j := 0; j < 100; j++ {
+				buf := []byte{1}
+				conn.TrySend(&buf)
+				conn.GetGateId()
+			}
+		}()
+	}
+	for i := 0; i < 8; i++ {
+		wg.Add(1)
+		go func() { defer wg.Done(); conn.Close("test") }()
+	}
+	wg.Wait()
+	buf := []byte{2}
+	if conn.TrySend(&buf) {
+		t.Fatal("closed connection accepted a message")
+	}
+	if conn.GetGateSerConn() == nil {
+		t.Fatal("close changed socket pointer")
+	}
+	for {
+		select {
+		case <-conn.GetSendChannel():
+		default:
+			return
+		}
+	}
 }
