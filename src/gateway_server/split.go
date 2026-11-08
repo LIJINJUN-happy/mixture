@@ -6,7 +6,7 @@ import (
 	"mixture/src/common/printer"
 )
 
-// 处理服务进程连接对象发送过来的协议，返回 false 表示收到非法包，调用方应断开连接
+// 处理网关服务进程连接对象发送过来的协议，返回 false 表示收到非法包，调用方应断开连接
 func DealBufferData(newConn *NewConnection, readNum int, l *CutIndexList, sliceBuffer []byte) bool {
 	if !DoSplit(newConn.StreamBuffer, newConn.ReadBuf, readNum, l, sliceBuffer) {
 		return false
