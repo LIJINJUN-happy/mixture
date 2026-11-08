@@ -7,6 +7,9 @@ slogLevel=0
 --网络模式（TCP连接还是WebSock连接模式，参数分别是tcp或者是ws）
 workMode=tcp
 
+--数据包切割方法
+streamBufferDealWay=1
+
 --协议类型（分别是protobuf或者是json格式）
 protocolType=protobuf
 

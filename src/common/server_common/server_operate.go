@@ -232,7 +232,7 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 
 	//读取网关发送过来的数据
 	readObj := new(gateway_server.ReadStreamBufferObject)
-	readObj.Init(1) //进程间默认用模式1分割字节数据
+	readObj.Init(gateway_server.ReadStreamBufferObjectWay) //进程间默认用模式1分割字节数据
 	readBuff := make([]byte, gateway_server.ConnReadBufSize)
 	sliceBuffer := make([]byte, int(gateway_server.MaxPacketBodySize)+gateway_server.ConnReadBufSize)
 	var cutList gateway_server.CutIndexList

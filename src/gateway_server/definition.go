@@ -139,6 +139,7 @@ type GateInformation struct {
 	port                        string
 	workMode                    string        //tcp or ws(webSocket)
 	protocol                    string        //json or protobuf
+	streamBufferDealWay         uint8         //切割数据流方式(作用于客户端和Gate之间)
 	maxConnSize                 int32         //接收客户端数据协程最大并发数量
 	rebuildListenTimes          atomic.Int32  //重启次数（太多次直接Exit）
 	rebuildListenSec            time.Duration //重新启动监听延迟（监听panic后重启监听的间隔时间）

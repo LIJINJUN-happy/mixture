@@ -92,6 +92,16 @@ func DoInit(db *sql.DB) error {
 	protocolType := tools.GetSysValueByKey("protocolType")
 	GateInfo.protocol = protocolType
 
+	way := tools.GetSysValueByKey("streamBufferDealWay")
+	if wayNum, errWay := strconv.Atoi(way); errWay != nil {
+		return errWay
+	} else {
+		if wayNum < 1 || wayNum > 3 {
+			return fmt.Errorf("streamBufferDealWay必须为1、2或3,当前值为%d", wayNum)
+		}
+		GateInfo.streamBufferDealWay = uint8(wayNum)
+	}
+
 	//查找interactiveSer的ID标识
 	interactiveSerId, errIsId := database.GetInteractiveSerIdByGateId(GateInfo.gateId, db)
 	if errIsId != nil {
