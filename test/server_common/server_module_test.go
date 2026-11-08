@@ -171,10 +171,33 @@ func TestSynchronousModuleCall(t *testing.T) {
 		started, release := make(chan struct{}), make(chan struct{})
 		withModule(t, "full", 1, func(...any) interface{} { close(started); <-release; return nil }, func() {
 			defer close(release)
-			sc.AsynchronousPack2Module("full", "echo", nil)
+			if !sc.AsynchronousPack2Module("full", "echo", nil) {
+				t.Fatal("empty queue rejected async call")
+			}
 			<-started
 			queue := sc.InterfaceName2ModMap["echo"]
 			queue <- &sc.ModulePackInfo{InterfaceName: "noop"}
+			asyncDone := make(chan bool, 1)
+			go func() { asyncDone <- sc.AsynchronousPack2Module("full", "echo", nil) }()
+			select {
+			case accepted := <-asyncDone:
+				if accepted {
+					t.Fatal("full queue accepted async call")
+				}
+			case <-time.After(time.Second):
+				t.Fatal("async enqueue blocked")
+			}
+			sc.ProtoName2ModMap["full_proto"] = queue
+			defer delete(sc.ProtoName2ModMap, "full_proto")
+			buf := sc.ReceivePacketBufPool.Get().(*[]byte)
+			*buf = (*buf)[:6]
+			protoDone := make(chan struct{})
+			go func() { sc.TranspondProtoPack(buf, "full_proto", 1, 1); close(protoDone) }()
+			select {
+			case <-protoDone:
+			case <-time.After(time.Second):
+				t.Fatal("protocol enqueue blocked")
+			}
 			done := make(chan interface{}, 1)
 			go func() { done <- sc.SynchronousPack2Module("full", "echo", nil) }()
 			select {

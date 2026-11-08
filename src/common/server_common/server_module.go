@@ -238,17 +238,25 @@ func SynchronousPack2Module(modName string, interfaceFuncName string, args []any
 	return nil
 }
 
-// 打包模块“异步”调用数据到对应的模块通道
-func AsynchronousPack2Module(modName string, interfaceFuncName string, args []any) {
+// 非阻塞投递异步调用;true仅表示已入队，false表示未投递，调用方可处理失败。
+func AsynchronousPack2Module(modName string, interfaceFuncName string, args []any) bool {
 	if sm, ok := ServerModMgr.Load(modName); ok {
 		if mod, res := sm.(*ServerModule); res {
 			info := ModulePackInfoPool.Get().(*ModulePackInfo)
 			info.InterfaceName = interfaceFuncName
 			info.ArgsList = args
 			info.ReturnChan = nil
-			mod.receiptChan <- info
+			select {
+			case mod.receiptChan <- info:
+				return true
+			default:
+				*info = ModulePackInfo{}
+				ModulePackInfoPool.Put(info)
+				printer.TextWarn("AsynchronousPack2Module Queue Full", "ModName", modName, "CallFunc", interfaceFuncName)
+			}
 		}
 	} else {
 		printer.TextError("AsynchronousPack2Module_modNameError", "ModName", modName)
 	}
+	return false
 }

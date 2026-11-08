@@ -405,7 +405,16 @@ func TranspondProtoPack(data *[]byte, proName string, gateId int, sessionID uint
 		info.GateId = gateId
 		info.ProName = proName
 		info.SessionID = sessionID
-		modChan <- info
+		// 入队成功后由模块回收,队列满时由当前协程回收,避免阻塞连接退出。
+		select {
+		case modChan <- info:
+		default:
+			*data = (*data)[:cap(*data)]
+			ReceivePacketBufPool.Put(data)
+			*info = ProtoPackInfo{}
+			ProtoPackInfoPool.Put(info)
+			printer.TextWarn("TranspondProtoPack Queue Full, Drop Packet", "proName", proName, "gateId", gateId, "sessionID", sessionID)
+		}
 		return
 	}
 
