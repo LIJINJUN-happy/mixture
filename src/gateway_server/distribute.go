@@ -295,6 +295,13 @@ func CheckLoadProtocol() {
 
 // Gate进程发送协议去服务进程
 func SendMsg2Server(sessionId uint32, protoName string, data []byte) {
+	// 与DeliveryMsg保持一致：内部包体需要预留协议号和sessionId。
+	// 必须在取池对象和切片前检查，避免超限包及切片越界。
+	msgLimit := int(MaxPacketBodySize) - ProtoNumLen - SessionIdLen
+	if len(data) > msgLimit {
+		printer.TextWarn("SendMsg2Server Oversized Data", "protoName", protoName, "size", len(data), "limit", msgLimit)
+		return
+	}
 	p, searchRes := ProtocolDistributeInfo.ProtoNameMap[protoName]
 	if !searchRes {
 		printer.TextError("SendMsg2Server Fail", "protoName", protoName, "data", data, "pnum", p)
