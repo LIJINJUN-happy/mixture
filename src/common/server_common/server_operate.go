@@ -431,6 +431,11 @@ func (s *ServerInfo) TryCallServerFunc(data *[]byte, proName string) {
 
 // 该协议用于发送服务中的协议返回gate进程处理,参数①发送目标网关的ID,②sessionId(非发送给客户端可以为0否者必须指定sessionID),③协议名字,④数据内容
 func DeliveryMsg(gateID int, sessionId uint32, protoName string, data []byte) {
+	MsgLimit := int(gateway_server.MaxPacketBodySize) - gateway_server.ProtoNumLen - gateway_server.SessionIdLen
+	if len(data) > MsgLimit {
+		printer.TextWarn("DeliveryMsg Oversized Data", "protoName", protoName, "size", len(data), "limit", MsgLimit)
+		return // 验证服务端发送的业务数据上限
+	}
 	protoNum, searchRes := gateway_server.ProtocolDistributeInfo.ProtoNameMap[protoName]
 	if !searchRes {
 		printer.TextError("ProtoNameMap Search Fail", "protoName", protoName)
