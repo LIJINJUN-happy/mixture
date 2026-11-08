@@ -238,7 +238,7 @@ func SynchronousPack2Module(modName string, interfaceFuncName string, args []any
 	return nil
 }
 
-// 非阻塞投递异步调用;true仅表示已入队，false表示未投递，调用方可处理失败。
+// 打包模块调用数据“异步”到对应的模块通道;true仅表示已入队，false表示未投递，调用方可处理失败。
 func AsynchronousPack2Module(modName string, interfaceFuncName string, args []any) bool {
 	if sm, ok := ServerModMgr.Load(modName); ok {
 		if mod, res := sm.(*ServerModule); res {
