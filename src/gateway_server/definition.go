@@ -156,6 +156,7 @@ type clientSession struct {
 
 // ReadStreamBufferObject读取字节流的数据存放处,每个包都是头部2字节，2字节保存的值是数据的长度
 type ReadStreamBufferObject struct {
+	minPacketBodySize uint16  //当前连接包体必须包含的协议字段长度
 	maxPacketBodySize uint16  //当前连接允许的最大包体长度
 	readWay           uint8   //字节流切割方式
 	headReadArray     []uint8 //包头已读字节（tcp属于字节流,被分割的有可能是包头部分）
@@ -166,6 +167,7 @@ type ReadStreamBufferObject struct {
 
 // ReadStreamBufferObject初始化方法
 func (streanBuff *ReadStreamBufferObject) Init(way uint8) {
+	streanBuff.minPacketBodySize = uint16(SessionIdLen + ProtoNumLen)
 	streanBuff.maxPacketBodySize = MaxPacketBodySize //默认用于进程间连接
 	streanBuff.readWay = way
 	streanBuff.headReadArray = make([]uint8, 0, HeadLen)
@@ -179,6 +181,7 @@ func (netObj *NewConnection) Init(way uint8, socketConn *net.Conn, wSocketConn *
 	rsbObject := new(ReadStreamBufferObject)
 	rsbObject.Init(way)
 	rsbObject.maxPacketBodySize = MaxClientPacketBodySize
+	rsbObject.minPacketBodySize = uint16(ProtoNumLen)
 	netObj.StreamBuffer = rsbObject
 	netObj.wsConn = wSocketConn
 	netObj.conn = socketConn

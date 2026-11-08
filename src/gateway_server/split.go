@@ -50,9 +50,9 @@ func DoSplitByReadHeadLen(j *ReadStreamBufferObject, byteSlice []byte, readNum i
 			j.headReadArray = append(j.headReadArray, byteSlice[:diffLen]...)
 			j.totalNeedReadLen = binary.BigEndian.Uint16(j.headReadArray[:HeadLen])
 
-			// 空包无法承载协议号，也不能与“尚未读头”的0状态混用。
+			// 客户端至少包含协议号，内部连接还必须包含sessionId。
 			// 错误由调用方记录并断连。
-			if j.totalNeedReadLen == 0 || j.totalNeedReadLen > j.maxPacketBodySize {
+			if j.totalNeedReadLen < j.minPacketBodySize || j.totalNeedReadLen > j.maxPacketBodySize {
 				j.totalNeedReadLen, j.curReadLen = 0, 0
 				j.byteData = j.byteData[0:0]
 				j.headReadArray = j.headReadArray[0:0]

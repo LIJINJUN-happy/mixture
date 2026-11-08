@@ -49,15 +49,18 @@ func makePacket(body []byte) []byte {
 }
 
 func newStream() *gate.ReadStreamBufferObject {
-	stream := new(gate.ReadStreamBufferObject)
-	stream.Init(1)
-	return stream
+	conn := new(gate.NewConnection)
+	conn.Init(1, nil, nil, "tcp")
+	return conn.StreamBuffer
 }
 
 // splitChunks 模拟TCP固定读缓冲：未读区域填充旧数据，readNum表示本次有效长度。
 func splitChunks(t *caseT, chunks ...[]byte) ([][]byte, bool) {
 	t.Helper()
-	stream := newStream()
+	return splitWithStream(t, newStream(), chunks...)
+}
+
+func splitWithStream(t *caseT, stream *gate.ReadStreamBufferObject, chunks ...[]byte) ([][]byte, bool) {
 	readBuffer := make([]byte, gate.ConnReadBufSize)
 	out := make([]byte, int(gate.MaxPacketBodySize)+gate.ConnReadBufSize)
 	var list gate.CutIndexList
@@ -178,13 +181,15 @@ func TestDoSplitByReadHeadLen17Scenarios(t *caseT) {
 		}
 	})
 
-	t.Run("07_4096字节大残包完成后紧跟4093字节包", func(t *caseT) {
+	t.Run("07_4098字节大残包完成后紧跟4093字节包", func(t *caseT) {
 		bodyA := bytes.Repeat([]byte{0xA1}, int(gate.MaxPacketBodySize))
 		bodyB := bytes.Repeat([]byte{0xB2}, 4093)
 		packetA := makePacket(bodyA)
 		packetB := makePacket(bodyB)
 		lastChunk := append(bytes.Clone(packetA[len(packetA)-1:]), packetB...)
-		got, ok := splitChunks(t, packetA[:3002], packetA[3002:len(packetA)-1], lastChunk)
+		stream := new(gate.ReadStreamBufferObject)
+		stream.Init(1)
+		got, ok := splitWithStream(t, stream, packetA[:3002], packetA[3002:len(packetA)-1], lastChunk)
 		if !ok {
 			t.Fatal("large packet sequence was rejected")
 		}
@@ -201,17 +206,15 @@ func TestDoSplitByReadHeadLen17Scenarios(t *caseT) {
 		requireProtocolBodyLength(t, got[0], gate.ProtoNumLen, int(gate.MaxPacketBodySize), true)
 	})
 
-	t.Run("09_客户端长度1被协议层拒绝", func(t *caseT) {
+	t.Run("09_客户端长度1被切包拒绝", func(t *caseT) {
 		body := []byte{1}
 		got, ok := splitChunks(t, makePacket(body))
-		if !ok {
-			t.Fatal("generic framing rejected the one-byte body")
+		if ok || len(got) != 0 {
+			t.Fatal("invalid packet accepted by DoSplit")
 		}
-		requirePackets(t, got, body)
-		requireProtocolBodyLength(t, got[0], gate.ProtoNumLen, int(gate.MaxPacketBodySize), false)
 	})
 
-	t.Run("10_客户端最大长度4092", func(t *caseT) {
+	t.Run("10_客户端最大长度4094", func(t *caseT) {
 		body := bytes.Repeat([]byte{0xA0}, int(gate.MaxPacketBodySize)-gate.SessionIdLen)
 		body[0], body[1] = 0, 1
 		got, ok := splitChunks(t, makePacket(body))
@@ -222,19 +225,20 @@ func TestDoSplitByReadHeadLen17Scenarios(t *caseT) {
 		requireProtocolBodyLength(t, got[0], gate.ProtoNumLen, int(gate.MaxPacketBodySize)-gate.SessionIdLen, true)
 	})
 
-	t.Run("11_客户端长度4093被协议层拒绝", func(t *caseT) {
+	t.Run("11_客户端长度4095被切包拒绝", func(t *caseT) {
 		body := bytes.Repeat([]byte{0xA1}, int(gate.MaxPacketBodySize)-gate.SessionIdLen+1)
-		got, ok := splitChunks(t, makePacket(body))
-		if !ok {
-			t.Fatal("generic framing rejected the body before protocol validation")
+		packet := makePacket(body)
+		got, ok := splitChunks(t, packet[:2], packet[2:])
+		if ok || len(got) != 0 {
+			t.Fatal("invalid packet accepted by DoSplit")
 		}
-		requirePackets(t, got, body)
-		requireProtocolBodyLength(t, got[0], gate.ProtoNumLen, int(gate.MaxPacketBodySize)-gate.SessionIdLen, false)
 	})
 
 	t.Run("12_内部最小长度6", func(t *caseT) {
 		body := []byte{0, 0, 0, 1, 0, 2}
-		got, ok := splitChunks(t, makePacket(body))
+		stream := new(gate.ReadStreamBufferObject)
+		stream.Init(1)
+		got, ok := splitWithStream(t, stream, makePacket(body))
 		if !ok {
 			t.Fatal("minimum internal body framing was rejected")
 		}
@@ -242,20 +246,22 @@ func TestDoSplitByReadHeadLen17Scenarios(t *caseT) {
 		requireProtocolBodyLength(t, got[0], gate.SessionIdLen+gate.ProtoNumLen, int(gate.MaxPacketBodySize), true)
 	})
 
-	t.Run("13_内部长度5被协议层拒绝", func(t *caseT) {
+	t.Run("13_内部长度5被切包拒绝", func(t *caseT) {
 		body := []byte{0, 0, 0, 1, 0}
-		got, ok := splitChunks(t, makePacket(body))
-		if !ok {
-			t.Fatal("generic framing rejected the five-byte body")
+		stream := new(gate.ReadStreamBufferObject)
+		stream.Init(1)
+		got, ok := splitWithStream(t, stream, makePacket(body))
+		if ok || len(got) != 0 {
+			t.Fatal("invalid packet accepted by DoSplit")
 		}
-		requirePackets(t, got, body)
-		requireProtocolBodyLength(t, got[0], gate.SessionIdLen+gate.ProtoNumLen, int(gate.MaxPacketBodySize), false)
 	})
 
-	t.Run("14_内部最大长度4096", func(t *caseT) {
+	t.Run("14_内部最大长度4098", func(t *caseT) {
 		body := bytes.Repeat([]byte{0xB0}, int(gate.MaxPacketBodySize))
 		packet := makePacket(body)
-		got, ok := splitChunks(t, packet[:gate.ConnReadBufSize], packet[gate.ConnReadBufSize:])
+		stream := new(gate.ReadStreamBufferObject)
+		stream.Init(1)
+		got, ok := splitWithStream(t, stream, packet[:gate.ConnReadBufSize], packet[gate.ConnReadBufSize:])
 		if !ok {
 			t.Fatal("maximum internal body was rejected")
 		}

@@ -25,6 +25,11 @@ func TestConnectionPacketLimits(t *testing.T) {
 		size     int
 		accepted bool
 	}{
+		{"client empty", client.StreamBuffer, 0, false},
+		{"client short", client.StreamBuffer, 1, false},
+		{"client minimum", client.StreamBuffer, 2, true},
+		{"internal short", internal, 5, false},
+		{"internal minimum", internal, 6, true},
 		{"client maximum", client.StreamBuffer, 4094, true},
 		{"client oversized", client.StreamBuffer, 4095, false},
 		{"forwarded maximum", internal, 4098, true},
@@ -33,7 +38,9 @@ func TestConnectionPacketLimits(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			packet := make([]byte, tc.size+gw.HeadLen)
 			binary.BigEndian.PutUint16(packet, uint16(tc.size))
-			packet[len(packet)-1] = 123
+			if tc.size > 0 {
+				packet[len(packet)-1] = 123
+			}
 			var cuts gw.CutIndexList
 			out := make([]byte, gw.ReadStreamBufferSize)
 			// 分开输入包头与包体，覆盖跨Read的情况。
