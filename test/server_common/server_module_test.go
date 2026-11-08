@@ -3,6 +3,7 @@ package server_common_test
 import (
 	"mixture/src/common/printer"
 	sc "mixture/src/common/server_common"
+	gw "mixture/src/gateway_server"
 	"net"
 	"os"
 	"os/exec"
@@ -36,6 +37,38 @@ func TestSynchronousModuleCall(t *testing.T) {
 	}
 	printer.InitPrinterMgr()
 	printer.SetLoggerObj(printer.CreateLogger("test", "log/", false))
+	t.Run("linker writer stop and socket failure", func(t *testing.T) {
+		for _, failHandshake := range []bool{false, true} {
+			local, remote := net.Pipe()
+			stop, done := make(chan struct{}), make(chan struct{})
+			go func() {
+				defer close(done)
+				gw.DealWithLinkerData(new(gw.SerLinker), local, stop)
+			}()
+			if failHandshake {
+				remote.Close()
+			} else {
+				remote.SetReadDeadline(time.Now().Add(time.Second))
+				handshake := make([]byte, 1024)
+				if _, err := remote.Read(handshake); err != nil {
+					t.Fatal(err)
+				}
+				close(stop)
+			}
+			select {
+			case <-done:
+			case <-time.After(time.Second):
+				local.Close()
+				remote.Close()
+				t.Fatal("writer failed to exit")
+			}
+			if _, err := local.Write([]byte{1}); err == nil {
+				t.Fatal("writer did not close its socket")
+			}
+			remote.Close()
+		}
+	})
+
 	oldTimeout := sc.ModCallerTimeOut
 	defer func() { sc.ModCallerTimeOut = oldTimeout }()
 

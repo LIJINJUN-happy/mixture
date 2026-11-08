@@ -126,18 +126,21 @@ func DoInit(db *sql.DB) error {
 /*链接xxx服务进程,收发gatewaySer和xxxSer之间的数据信息*/
 func BeginLinkServer(sl *SerLinker) {
 	go func(serLinker *SerLinker) {
-		defer func(s *SerLinker) {
-			if s.serConn != nil {
-				s.receiveChannel <- nil //通知停止处理(*dialObject).Write操作,因为panic重启该协程,会造成旧的write协程没被销毁从而协程泄露
-				if closeErr := (*s.serConn).Close(); closeErr != nil {
-					printer.TextError(s.linkerName, " dial.Close() Failed With Defer", closeErr)
-				}
+		var dial net.Conn
+		stop := make(chan struct{})  //本次连接的退出通知，不占用业务队列
+		var writerDone chan struct{} //旧写协程退出后才允许重连
+		defer func() {
+			close(stop)
+			if dial != nil {
+				dial.Close()
 			}
-			go BeginLinkServer(s)
-		}(serLinker)
+			if writerDone != nil {
+				<-writerDone
+			}
+			BeginLinkServer(serLinker)
+		}()
 		time.Sleep(GateInfo.rebuildListenSec * time.Second)
 
-		var dial net.Conn
 		for {
 			var err error
 			if dial, err = net.Dial("tcp", serLinker.address); err != nil {
@@ -146,11 +149,14 @@ func BeginLinkServer(sl *SerLinker) {
 				continue //链接失败再重新尝试,不成功就不创建dealWithLinkerData协程,避免协程泄露
 			}
 			printer.TextInfo("Link Success", "LinkerName", serLinker.linkerName)
-			serLinker.serConn = &dial
 			break
 		}
 
-		go DealWithLinkerData(serLinker)
+		writerDone = make(chan struct{})
+		go func() {
+			defer close(writerDone)
+			DealWithLinkerData(serLinker, dial, stop)
+		}()
 
 		//读取字节流所需的结构对象以及容器
 		rsbObject := &ReadStreamBufferObject{
@@ -195,37 +201,45 @@ func BeginLinkServer(sl *SerLinker) {
 }
 
 // 处理连接器中的Channel收到的数据
-func DealWithLinkerData(linker *SerLinker) {
-	defer func(s *SerLinker) {
+// 每个写协程绑定本次socket，退出完成后才启动下一次连接。
+func DealWithLinkerData(linker *SerLinker, conn net.Conn, stop <-chan struct{}) {
+	var current *[]byte
+	defer func() {
+		// 写失败时关闭本次socket，唤醒读协程并触发重连。
+		conn.Close()
+		if current != nil {
+			*current = (*current)[:cap(*current)]
+			DistributeDataPool.Put(current)
+		}
 		if r := recover(); r != nil {
 			printer.TextError("DealWithLinkerData Panic", "Error", r)
-			if s.serConn != nil {
-				(*s.serConn).Close()
-			}
 		}
-	}(linker)
+	}()
 
-	//连接上对应的服务进程后,发送本地gatewayID给予服务进程作为标识ID区分
-	SendGateIDToRemoteSer(linker.serConn, linker.linkerName)
-
+	SendGateIDToRemoteSer(&conn, linker.linkerName)
 	dataSlice := make([]byte, ReadStreamBufferSize)
 	for {
 		select {
+		case <-stop:
+			return //外层 select：等待数据时，也能收到停止通知。
 		case bufPtr := <-linker.receiveChannel:
 			if bufPtr == nil {
-				return // 关闭信号
+				return
 			}
-			num := DoPack(dataSlice, *bufPtr, ReadStreamBufferObjectWay) //默认内部转发用方式1,包头+包体
-			if num > 0 {
-				if _, writeErr := (*linker.serConn).Write(dataSlice[0:num]); writeErr != nil {
-					printer.TextError("GateWay DialObject Write Fail", "writeErr", writeErr)
-				} /*else {
-					printer.TextDebug("GateWay DialObject Write Success", "writeNum", num, "dataSlice", string(dataSlice[0:num]))
-				}*/
+			current = bufPtr
+			if num := DoPack(dataSlice, *bufPtr, ReadStreamBufferObjectWay); num > 0 {
+				n, err := conn.Write(dataSlice[:num])
+				if err == nil && n != num {
+					err = io.ErrShortWrite
+				}
+				if err != nil {
+					printer.TextError("GateWay DialObject Write Fail", "writeErr", err)
+					return
+				}
 			}
-			// 恢复容量后归还池，原始指针直接 Put，零逃逸
 			*bufPtr = (*bufPtr)[:cap(*bufPtr)]
 			DistributeDataPool.Put(bufPtr)
+			current = nil
 		}
 	}
 }

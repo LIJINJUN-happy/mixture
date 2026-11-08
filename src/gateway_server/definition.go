@@ -120,8 +120,7 @@ type NewConnection struct {
 type SerLinker struct {
 	linkerName     string
 	address        string
-	receiveChannel chan *[]byte //用来接收所有将要派发到对应进程的数据（相当于连接器发送缓存通道）nil 表示关闭信号
-	serConn        *net.Conn    //链接xx服务进程的socket对象
+	receiveChannel chan *[]byte //发送缓存队列，重连期间保留；退出通知使用每次连接独立的通道
 }
 
 // GateInformation for GateWaySer Object 网关服务相关参数
@@ -268,7 +267,6 @@ func (linker *SerLinker) InitLinker(linkerName string, db *sql.DB, linkerID int)
 	}
 
 	linker.receiveChannel = make(chan *[]byte, channelBufferSize)
-	linker.serConn = nil
 	linker.linkerName = linkerName
 
 	var strBuilder strings.Builder
