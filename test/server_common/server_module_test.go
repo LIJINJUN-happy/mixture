@@ -1,6 +1,7 @@
 package server_common_test
 
 import (
+	"encoding/binary"
 	"mixture/src/common/printer"
 	sc "mixture/src/common/server_common"
 	gw "mixture/src/gateway_server"
@@ -12,6 +13,43 @@ import (
 	"testing"
 	"time"
 )
+
+func TestConnectionPacketLimits(t *testing.T) {
+	client := new(gw.NewConnection)
+	client.Init(1, nil, nil, "tcp")
+	internal := new(gw.ReadStreamBufferObject)
+	internal.Init(1)
+	for _, tc := range []struct {
+		name     string
+		stream   *gw.ReadStreamBufferObject
+		size     int
+		accepted bool
+	}{
+		{"client maximum", client.StreamBuffer, 4094, true},
+		{"client oversized", client.StreamBuffer, 4095, false},
+		{"forwarded maximum", internal, 4098, true},
+		{"internal oversized", internal, 4099, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			packet := make([]byte, tc.size+gw.HeadLen)
+			binary.BigEndian.PutUint16(packet, uint16(tc.size))
+			packet[len(packet)-1] = 123
+			var cuts gw.CutIndexList
+			out := make([]byte, gw.ReadStreamBufferSize)
+			// 分开输入包头与包体，覆盖跨Read的情况。
+			ok := gw.DoSplit(tc.stream, packet[:gw.HeadLen], gw.HeadLen, &cuts, out)
+			if ok {
+				ok = gw.DoSplit(tc.stream, packet[gw.HeadLen:], tc.size, &cuts, out)
+			}
+			if ok != tc.accepted {
+				t.Fatalf("accepted=%v, want %v", ok, tc.accepted)
+			}
+			if ok && (cuts.Len() != 1 || cuts.Get(0) != tc.size || out[tc.size-1] != 123) {
+				t.Fatal("packet truncated")
+			}
+		})
+	}
+}
 
 // Run in a child process so Windows releases the framework's log handles
 // before the parent removes the temporary working directory.

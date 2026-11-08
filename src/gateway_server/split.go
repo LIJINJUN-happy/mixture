@@ -52,7 +52,7 @@ func DoSplitByReadHeadLen(j *ReadStreamBufferObject, byteSlice []byte, readNum i
 
 			// 空包无法承载协议号，也不能与“尚未读头”的0状态混用。
 			// 错误由调用方记录并断连。
-			if j.totalNeedReadLen == 0 || j.totalNeedReadLen > MaxPacketBodySize {
+			if j.totalNeedReadLen == 0 || j.totalNeedReadLen > j.maxPacketBodySize {
 				j.totalNeedReadLen, j.curReadLen = 0, 0
 				j.byteData = j.byteData[0:0]
 				j.headReadArray = j.headReadArray[0:0]
@@ -109,8 +109,8 @@ func DoSplitBySign(j *ReadStreamBufferObject, byteSlice []byte, readNum int, lis
 		//没找到就直接追加上去然后break
 		if index == -1 {
 			j.byteData = append(j.byteData, byteSlice...)
-			if uint16(len(j.byteData)) > MaxPacketBodySize {
-				printer.TextWarn("DoSplitBySign", "Oversized packet accumulated", len(j.byteData), "limit", MaxPacketBodySize)
+			if len(j.byteData) > int(j.maxPacketBodySize) {
+				printer.TextWarn("DoSplitBySign", "Oversized packet accumulated", len(j.byteData), "limit", j.maxPacketBodySize)
 				j.byteData = j.byteData[0:0]
 			}
 			break
@@ -118,8 +118,8 @@ func DoSplitBySign(j *ReadStreamBufferObject, byteSlice []byte, readNum int, lis
 			//在字符串中有切割符号
 			j.byteData = append(j.byteData, byteSlice[:index]...)
 			lenData := len(j.byteData)
-			if uint16(lenData) > MaxPacketBodySize {
-				printer.TextWarn("DoSplitBySign", "Oversized packet accumulated", len(j.byteData), "limit", MaxPacketBodySize)
+			if lenData > int(j.maxPacketBodySize) {
+				printer.TextWarn("DoSplitBySign", "Oversized packet accumulated", len(j.byteData), "limit", j.maxPacketBodySize)
 			} else if lenData > 0 {
 				//printer.TextDebug("doSplitBySign","The String", j.byteData)
 				retNum := copy(sliceBuffer[beginIdx:], j.byteData[0:])

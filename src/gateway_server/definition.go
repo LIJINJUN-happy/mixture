@@ -19,21 +19,26 @@ const (
 	ConnReadBufSize                  = 4096              //每次读取客户端传来的数据长度大小
 	ConnWriteChanCaps                = 64                //写信道缓存容量
 	ReadStreamBufferSize             = 5120              //字节流读取对象的已读书缓存长度(1024 * 5 )
-	MaxPacketBodySize                = uint16(4096)      //单个数据包体最大允许长度，超出视为非法包
-	MaxPacketsPerRead                = 1024              //一次 Read 最多切出的包数上限，超出丢弃并报警
 	ReadStreamBufferObjectWay uint8  = 1                 //字节流切割方式
 	MaxConnectClientNum              = 10000             //最大客户端同时连接数量
 	messageType               int    = 1                 //webSocket的消息类型（默认为1文本类型）
 	maxGateRebuildListenTimes int32  = 10                //网关监听最大重启次数
 	splitSign                        = 124               //字节流切割的标识符（’|’）
-	HeadLen                   int    = 2                 //数据包头部长度（多少字节）,大端
-	ProtoNumLen               int    = 2                 //数据包中的协议占的字节长度,大端
-	SessionIdLen              int    = 4                 //数据包来自哪个用户标识的字节长度（来自客户端或者是发送给客户端的时候必须有这个字段内容值,否者找不到发送目标）
 	appointLen                uint16 = 556               //定长读取字节流的长度
 	channelBufferSize                = 2048              //channelArray中每个chan的缓存大小
 	ConnReadTimeout                  = 180 * time.Second //读取用户超时间隔（为了防止长时间无响应的情况）
 	IntervalLoopingTime              = 30 * time.Second
 	GoroutineSyncBreakSign           = "_CLOSE"
+)
+
+const (
+	HeadLen                 int = 2                                              //数据包头部长度（多少字节）,大端
+	ProtoNumLen             int = 2                                              //数据包中的协议占的字节长度,大端
+	SessionIdLen            int = 4                                              //数据包来自哪个用户标识的字节长度（来自客户端或者是发送给客户端的时候必须有这个字段内容值,否者找不到发送目标）
+	MaxClientPacketSize         = 4096                                           //客户端完整包上限，包含包头和协议号
+	MaxPacketsPerRead           = 1024                                           //一次 Read 最多切出的包数上限，超出丢弃并报警
+	MaxClientPacketBodySize     = uint16(MaxClientPacketSize - HeadLen)          //客户端包体上限（不包含头部）
+	MaxPacketBodySize           = MaxClientPacketBodySize + uint16(SessionIdLen) //内部包体上限，预留转发增加的sessionId
 )
 
 // 声明在调用方栈上，零堆分配，零 GC 压力（替代 container/list，存放每次DoSplit方法切出的包尾下标）
@@ -151,15 +156,17 @@ type clientSession struct {
 
 // ReadStreamBufferObject读取字节流的数据存放处,每个包都是头部2字节，2字节保存的值是数据的长度
 type ReadStreamBufferObject struct {
-	readWay          uint8   //字节流切割方式
-	headReadArray    []uint8 //包头已读字节（tcp属于字节流,被分割的有可能是包头部分）
-	totalNeedReadLen uint16  //累计需要读取的长度
-	curReadLen       uint16  //目前读取了的长度
-	byteData         []byte  //目前读取的字节数据
+	maxPacketBodySize uint16  //当前连接允许的最大包体长度
+	readWay           uint8   //字节流切割方式
+	headReadArray     []uint8 //包头已读字节（tcp属于字节流,被分割的有可能是包头部分）
+	totalNeedReadLen  uint16  //累计需要读取的长度
+	curReadLen        uint16  //目前读取了的长度
+	byteData          []byte  //目前读取的字节数据
 }
 
 // ReadStreamBufferObject初始化方法
 func (streanBuff *ReadStreamBufferObject) Init(way uint8) {
+	streanBuff.maxPacketBodySize = MaxPacketBodySize //默认用于进程间连接
 	streanBuff.readWay = way
 	streanBuff.headReadArray = make([]uint8, 0, HeadLen)
 	streanBuff.totalNeedReadLen = 0
@@ -171,6 +178,7 @@ func (streanBuff *ReadStreamBufferObject) Init(way uint8) {
 func (netObj *NewConnection) Init(way uint8, socketConn *net.Conn, wSocketConn *websocket.Conn, typeofConn string) {
 	rsbObject := new(ReadStreamBufferObject)
 	rsbObject.Init(way)
+	rsbObject.maxPacketBodySize = MaxClientPacketBodySize
 	netObj.StreamBuffer = rsbObject
 	netObj.wsConn = wSocketConn
 	netObj.conn = socketConn

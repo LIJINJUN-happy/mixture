@@ -159,13 +159,8 @@ func BeginLinkServer(sl *SerLinker) {
 		}()
 
 		//读取字节流所需的结构对象以及容器
-		rsbObject := &ReadStreamBufferObject{
-			readWay:          ReadStreamBufferObjectWay,
-			headReadArray:    make([]uint8, 0, HeadLen),
-			totalNeedReadLen: 0,
-			curReadLen:       0,
-			byteData:         make([]byte, 0, ReadStreamBufferSize),
-		}
+		rsbObject := new(ReadStreamBufferObject)
+		rsbObject.Init(ReadStreamBufferObjectWay)
 		serData := make([]byte, ConnReadBufSize)
 		sliceBuffer := make([]byte, int(MaxPacketBodySize)+ConnReadBufSize) //上一包残留 + 本次Read
 		var cutList CutIndexList
