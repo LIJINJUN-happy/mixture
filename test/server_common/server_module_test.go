@@ -3,6 +3,7 @@ package server_common_test
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"mixture/src/common/printer"
 	sc "mixture/src/common/server_common"
 	gw "mixture/src/gateway_server"
@@ -14,6 +15,29 @@ import (
 	"testing"
 	"time"
 )
+
+// 测量单个内部包切包成本，不包含网络、业务或进程启动。
+func BenchmarkSplitPacket(b *testing.B) {
+	for _, size := range []int{64, 1024, 4098} {
+		b.Run(fmt.Sprintf("body_%d", size), func(b *testing.B) {
+			packet := make([]byte, size+gw.HeadLen)
+			binary.BigEndian.PutUint16(packet, uint16(size))
+			stream := new(gw.ReadStreamBufferObject)
+			stream.Init(1)
+			out := make([]byte, gw.ReadStreamBufferSize)
+			var cuts gw.CutIndexList
+			b.ReportAllocs()
+			b.SetBytes(int64(size))
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				cuts.Reset()
+				if !gw.DoSplit(stream, packet, len(packet), &cuts, out) {
+					b.Fatal("split failed")
+				}
+			}
+		})
+	}
+}
 
 func TestOtherSplitModes(t *testing.T) {
 	for _, mode := range []uint8{2, 3} {
