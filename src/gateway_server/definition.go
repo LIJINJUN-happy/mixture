@@ -111,9 +111,13 @@ type NewConnection struct {
 	wsConn       *websocket.Conn //socket对象(ws模式)
 	ReadBuf      []byte          //socket读取的数据存放切片
 	writeChan    chan *[]byte    //socket获取数据的通信道（来自其他进程进程的数据）
-	rwChannel    chan string     //用于conn对象的Read和Write协程间的通知,实现同步关闭,不同步关闭的话会造成内存泄露
 	ipString     string          //网络地址
 	StreamBuffer *ReadStreamBufferObject
+	closeMux     sync.RWMutex  //入队持读锁，关闭和会话注册持写锁
+	closed       bool          //是否停止入队，由closeMux保护
+	closeSign    chan struct{} //关闭时通知写协程退出
+	closeOnce    sync.Once     //保证关闭socket和移除会话只执行一次
+	closeErr     error         //保存关闭结果，通过closeOnce同步访问
 }
 
 // SerLinker进程连接器（和其他服务进程的链接对象）
@@ -138,11 +142,11 @@ type GateInformation struct {
 
 // 客户端的session元素
 type clientSession struct {
-	session           uint32       //session分配数值
-	ip                net.IP       //客户端的IP地址
-	port              uint16       //端口值
-	wholeAddress      string       //端口+地址
-	clientBuffChannel chan *[]byte //客户端的接收协议的通信道
+	session      uint32         //session分配数值
+	ip           net.IP         //客户端的IP地址
+	port         uint16         //端口值
+	wholeAddress string         //端口+地址
+	connection   *NewConnection //回包经连接对象入队，与关闭状态同步
 }
 
 // ReadStreamBufferObject读取字节流的数据存放处,每个包都是头部2字节，2字节保存的值是数据的长度
@@ -175,7 +179,7 @@ func (netObj *NewConnection) Init(way uint8, socketConn *net.Conn, wSocketConn *
 	netObj.connTime = time.Now()
 	netObj.ReadBuf = make([]byte, ConnReadBufSize)
 	netObj.writeChan = make(chan *[]byte, ConnWriteChanCaps)
-	netObj.rwChannel = make(chan string, 2)
+	netObj.closeSign = make(chan struct{})
 
 	//设置ipString作为Goroutine的标识映射
 	if socketConn != nil {
@@ -186,7 +190,12 @@ func (netObj *NewConnection) Init(way uint8, socketConn *net.Conn, wSocketConn *
 }
 
 // 往map中添加newConnection对应的writeChan
-func (netObj *NewConnection) AddIntoGateMap(writeChan chan *[]byte) {
+func (netObj *NewConnection) AddIntoGateMap() {
+	netObj.closeMux.Lock()
+	defer netObj.closeMux.Unlock()
+	if netObj.closed || netObj.connSession != 0 {
+		return
+	}
 	clientAddress := (*netObj).RemoteAddr().String()
 	//printer.TextDebug("clientAddress = " + clientAddress)
 	//不用担心超过uint32后溢出的情况，Add方法在溢出时会自动回绕（wrap around），这是无符号整数在底层硬件上的标准行为
@@ -203,7 +212,7 @@ func (netObj *NewConnection) AddIntoGateMap(writeChan chan *[]byte) {
 	sessionPtr.ip = net.ParseIP(ip)
 	sessionPtr.port = uint16(realPort)
 	sessionPtr.wholeAddress = clientAddress
-	sessionPtr.clientBuffChannel = writeChan
+	sessionPtr.connection = netObj
 	GateClientMap.Store(sessionId, sessionPtr)
 
 	//标记该连接的SessionID
@@ -215,10 +224,13 @@ func (netObj *NewConnection) AddIntoGateMap(writeChan chan *[]byte) {
 
 // 移除map中的 writeChan,防止有数据继续写入而触发panic
 func (netObj *NewConnection) ReduceFromGateMap() {
+	netObj.closeMux.Lock()
+	defer netObj.closeMux.Unlock()
 	//clientAddress := (*netObj).RemoteAddr().String()
 	if netObj.connSession > 0 {
-		GateClientMap.Delete(netObj.connSession)
-		GateClientMapSize.Add(-1)
+		if _, removed := GateClientMap.LoadAndDelete(netObj.connSession); removed {
+			GateClientMapSize.Add(-1)
+		}
 	}
 	printer.TextDebug("After reduce client to GateMap", "The Size", GateClientMapSize.Load())
 }
@@ -245,10 +257,47 @@ func (netObj *NewConnection) Read() (int, []byte, error) {
 }
 
 func (netObj *NewConnection) Close() error {
-	if netObj.conn != nil {
-		return (*(netObj.conn)).Close()
+	netObj.closeOnce.Do(func() {
+		netObj.closeMux.Lock()
+		netObj.closed = true
+		close(netObj.closeSign)
+		netObj.closeMux.Unlock()
+		if netObj.conn != nil {
+			netObj.closeErr = (*netObj.conn).Close()
+		} else {
+			netObj.closeErr = netObj.wsConn.Close()
+		}
+		netObj.ReduceFromGateMap()
+	})
+	return netObj.closeErr
+}
+
+// TrySend 成功后由写协程回收缓冲区，失败时仍由调用方回收。
+func (netObj *NewConnection) TrySend(buf *[]byte) bool {
+	netObj.closeMux.RLock()
+	defer netObj.closeMux.RUnlock()
+	if netObj.closed || buf == nil {
+		return false
 	}
-	return (netObj.wsConn).Close()
+	select {
+	case netObj.writeChan <- buf:
+		return true
+	default:
+		return false
+	}
+}
+
+// Close禁止入队后，仅由写协程清理剩余缓冲区。
+func (netObj *NewConnection) drainWriteQueue() {
+	for {
+		select {
+		case buf := <-netObj.writeChan:
+			*buf = (*buf)[:cap(*buf)]
+			DistributeDataPool.Put(buf)
+		default:
+			return
+		}
+	}
 }
 
 func (netObj *NewConnection) RemoteAddr() net.Addr {

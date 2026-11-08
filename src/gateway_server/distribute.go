@@ -35,11 +35,10 @@ func SafeSendToLinker(linker *SerLinker, bufPtr *[]byte) {
 func SafeSendToGateClient(bufPtr *[]byte, sessionID uint32, protoNum uint16) {
 	if client, ok := GateClientMap.Load(sessionID); ok {
 		if session, isSession := client.(*clientSession); isSession {
-			select {
-			case session.clientBuffChannel <- bufPtr:
+			if session.connection.TrySend(bufPtr) {
 				return // 成功投递，bufPtr 由接收方回收
-			default:
-				printer.TextWarn("DoDistribute", "Client Buffer Full, Drop Msg SessionID", sessionID)
+			} else {
+				printer.TextWarn("DoDistribute", "Client Closed Or Buffer Full, Drop Msg SessionID", sessionID)
 			}
 		}
 	} else if sessionID == 0 {

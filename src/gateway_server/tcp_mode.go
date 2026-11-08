@@ -51,6 +51,7 @@ func BeginTcpSer() {
 			newConn.Init(ReadStreamBufferObjectWay, &conn, nil, "tcp")
 
 			//每个Actor连接读写分离
+			newConn.AddIntoGateMap()
 			go DoWriteMsg(newConn)
 			go DoReadMsg(newConn)
 		}
@@ -62,27 +63,29 @@ func DoWriteMsg(newConn *NewConnection) {
 	clientWriteGoroutineNum.Add(1)
 	printer.TextDebug("clientWriteGoroutineNum current value", "clientWriteGoroutineNum", clientWriteGoroutineNum.Load())
 
+	var current *[]byte
 	defer func() {
-		newConn.ReduceFromGateMap()     //移除Map中的客户端元素
+		newConn.Close()
+		if current != nil {
+			*current = (*current)[:cap(*current)]
+			DistributeDataPool.Put(current)
+		}
+		newConn.drainWriteQueue()
 		clientWriteGoroutineNum.Add(-1) //写协程数量同步变动减少
 	}()
 
 	sendBuffer := make([]byte, ReadStreamBufferSize)
 	for {
 		select {
-		case SynFromReadGoroutine := <-newConn.rwChannel:
-			if SynFromReadGoroutine == GoroutineSyncBreakSign {
-				printer.TextDebug("Received Signal", "msg", SynFromReadGoroutine)
-				return
-			}
+		case <-newConn.closeSign:
+			return
 		case bufPtr := <-newConn.writeChan:
+			current = bufPtr
 			num := DoPack(sendBuffer, (*bufPtr)[SessionIdLen:], newConn.StreamBuffer.readWay) //发送给客户端前需要把SessionID前缀去掉
 			if num > 0 {
 				sendByteNum, writeError := (*newConn).Write(sendBuffer[:num])
 				if writeError != nil {
 					printer.TextError("Write Error", "err", writeError.Error())
-					*bufPtr = (*bufPtr)[:cap(*bufPtr)]
-					DistributeDataPool.Put(bufPtr)
 					return
 				} else {
 					printer.TextDebug("Write Success", "Send Byte Size", strconv.Itoa(sendByteNum))
@@ -91,21 +94,19 @@ func DoWriteMsg(newConn *NewConnection) {
 			// 恢复容量后归还池，原始指针直接 Put，零逃逸
 			*bufPtr = (*bufPtr)[:cap(*bufPtr)]
 			DistributeDataPool.Put(bufPtr)
+			current = nil
 		}
 	}
 }
 
 func DoReadMsg(newConn *NewConnection) {
 	clientReadGoroutineNum.Add(1)
-	newConn.AddIntoGateMap(newConn.writeChan)
 	printer.TextDebug("clientReadGoroutineNum current value", "clientReadGoroutineNum", clientReadGoroutineNum.Load())
 
 	defer func() {
 		if r := recover(); r != nil {
 			printer.TextError("GateInfo.newConnPanic", "Recover", r, "Stack Trace", string(debug.Stack()))
 		}
-		newConn.rwChannel <- GoroutineSyncBreakSign
-		close(newConn.rwChannel)       //通知Write线程并关闭通知通道
 		(*newConn).Close()             //关闭套接字（关闭conn对象）
 		clientReadGoroutineNum.Add(-1) //读协程数量同步变动减少
 	}()

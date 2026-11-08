@@ -48,10 +48,9 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 	newConn := new(NewConnection)
 	newConn.Init(ReadStreamBufferObjectWay, nil, wsConn, "ws")
 	clientReadGoroutineNum.Add(1)
-	newConn.AddIntoGateMap(newConn.writeChan)
+	newConn.AddIntoGateMap()
 
 	defer func(wsc *NewConnection) {
-		wsc.rwChannel <- GoroutineSyncBreakSign
 		closeError := wsc.Close()
 		if closeError != nil {
 			printer.TextError("Failed To Close WsConn", "closeError", closeError)

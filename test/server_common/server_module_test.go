@@ -69,6 +69,45 @@ func TestSynchronousModuleCall(t *testing.T) {
 		}
 	})
 
+	t.Run("client write failure closes reader and rejects sends", func(t *testing.T) {
+		local, remote := net.Pipe()
+		defer remote.Close()
+		conn := new(gw.NewConnection)
+		conn.Init(1, &local, nil, "tcp")
+		readDone, writeDone := make(chan error, 1), make(chan struct{})
+		go func() { _, _, err := conn.Read(); readDone <- err }()
+		// A write deadline fails only the write side; the reader needs Close to wake.
+		local.SetWriteDeadline(time.Now().Add(-time.Second))
+		for i := 0; i < 8; i++ {
+			buf := gw.DistributeDataPool.Get().(*[]byte)
+			*buf = (*buf)[:8]
+			if !conn.TrySend(buf) {
+				t.Fatal("enqueue failed")
+			}
+		}
+		go func() { defer close(writeDone); gw.DoWriteMsg(conn) }()
+		select {
+		case <-writeDone:
+		case <-time.After(time.Second):
+			local.Close()
+			t.Fatal("writer did not exit")
+		}
+		select {
+		case err := <-readDone:
+			if err == nil {
+				t.Fatal("read unexpectedly succeeded")
+			}
+		case <-time.After(time.Second):
+			local.Close()
+			t.Fatal("reader remained blocked")
+		}
+		buf := []byte{1}
+		if conn.TrySend(&buf) {
+			t.Fatal("closed client accepted a packet")
+		}
+		conn.Close()
+	})
+
 	oldTimeout := sc.ModCallerTimeOut
 	defer func() { sc.ModCallerTimeOut = oldTimeout }()
 
