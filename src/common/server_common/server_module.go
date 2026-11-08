@@ -254,6 +254,8 @@ func AsynchronousPack2Module(modName string, interfaceFuncName string, args []an
 				ModulePackInfoPool.Put(info)
 				printer.TextWarn("AsynchronousPack2Module Queue Full", "ModName", modName, "CallFunc", interfaceFuncName)
 			}
+		} else {
+			printer.TextError("AsynchronousPack2Module_changeServerModuleError", "ModName", modName)
 		}
 	} else {
 		printer.TextError("AsynchronousPack2Module_modNameError", "ModName", modName)
