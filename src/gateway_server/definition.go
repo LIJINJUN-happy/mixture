@@ -262,9 +262,12 @@ func (netObj *NewConnection) Read() (int, []byte, error) {
 	}
 
 	_, p, errWithWsRead := (netObj.wsConn).ReadMessage()
+	if errWithWsRead != nil {
+		return 0, nil, errWithWsRead
+	}
 	netObj.ReadBuf = append(netObj.ReadBuf[0:0], p...)
 	//printer.TextInfo("netObj.readBuf","readBuf", netObj.ReadBuf)
-	return len(netObj.ReadBuf), netObj.ReadBuf, errWithWsRead
+	return len(netObj.ReadBuf), netObj.ReadBuf, nil
 }
 
 func (netObj *NewConnection) Close() error {

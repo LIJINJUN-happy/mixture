@@ -43,6 +43,8 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 		wsConn.Close()
 		return
 	}
+	// 限制单条WS消息（包含全部分片）的应用数据总长度，避免ReadMessage无限制分配内存。
+	wsConn.SetReadLimit(int64(MaxClientPacketSize))
 	printer.TextInfo("Upgraded WebSocket Connection Successfully")
 
 	newConn := new(NewConnection)
