@@ -1,6 +1,7 @@
 package server_common_test
 
 import (
+	"bytes"
 	"encoding/binary"
 	"mixture/src/common/printer"
 	sc "mixture/src/common/server_common"
@@ -13,6 +14,70 @@ import (
 	"testing"
 	"time"
 )
+
+func TestOtherSplitModes(t *testing.T) {
+	for _, mode := range []uint8{2, 3} {
+		body := []byte{0, 1, 42, 0, 0}
+		buf := make([]byte, gw.ReadStreamBufferSize)
+		n := gw.DoPack(buf, body, mode)
+		if n == 0 {
+			t.Fatal("pack failed")
+		}
+		packet := bytes.Clone(buf[:n])
+		input := append(bytes.Clone(packet), packet...)
+		for split := 1; split < len(input); split++ {
+			conn := new(gw.NewConnection)
+			conn.Init(mode, nil, nil, "tcp")
+			var cuts gw.CutIndexList
+			out := make([]byte, 1024)
+			var got []byte
+			count := 0
+			for _, chunk := range [][]byte{input[:split], input[split:]} {
+				cuts.Reset()
+				if !gw.DoSplit(conn.StreamBuffer, chunk, len(chunk), &cuts, out) {
+					t.Fatalf("mode %d split %d rejected", mode, split)
+				}
+				if cuts.Len() > 0 {
+					got = append(got, out[:cuts.Get(cuts.Len()-1)]...)
+				}
+				count += cuts.Len()
+			}
+			if count != 2 || !bytes.Equal(got, append(bytes.Clone(body), body...)) {
+				t.Fatal("roundtrip changed payload")
+			}
+		}
+		for _, tc := range []struct {
+			input    []byte
+			capacity int
+		}{
+			{packet, len(body) - 1},
+			{bytes.Repeat(packet, gw.MaxPacketsPerRead+1), (gw.MaxPacketsPerRead + 1) * len(body)},
+		} {
+			conn := new(gw.NewConnection)
+			conn.Init(mode, nil, nil, "tcp")
+			var cuts gw.CutIndexList
+			if gw.DoSplit(conn.StreamBuffer, tc.input, len(tc.input), &cuts, make([]byte, tc.capacity)) {
+				t.Fatal("overflow accepted")
+			}
+		}
+		conn := new(gw.NewConnection)
+		conn.Init(mode, nil, nil, "tcp")
+		var cuts gw.CutIndexList
+		bad := []byte{1, 124}
+		if mode == 3 {
+			bad = []byte{0, 1}
+		}
+		if gw.DoSplit(conn.StreamBuffer, bad, len(bad), &cuts, buf) {
+			t.Fatal("short body accepted")
+		}
+	}
+	if gw.DoPack(make([]byte, 1024), []byte{0, 124}, 2) != 0 {
+		t.Fatal("unescaped delimiter accepted")
+	}
+	if gw.DoPack(make([]byte, 1024), make([]byte, 555), 3) != 0 {
+		t.Fatal("oversized fixed body accepted")
+	}
+}
 
 func TestConnectionPacketLimits(t *testing.T) {
 	client := new(gw.NewConnection)
