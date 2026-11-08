@@ -36,7 +36,7 @@ const (
 	GoroutineSyncBreakSign           = "_CLOSE"
 )
 
-// 声明在调用方栈上，零堆分配，零 GC 压力（替代 container/list，存放每次 DoSplit 切出的包尾下标）
+// 声明在调用方栈上，零堆分配，零 GC 压力（替代 container/list，存放每次DoSplit方法切出的包尾下标）
 type CutIndexList struct {
 	data [MaxPacketsPerRead]int
 	len  int

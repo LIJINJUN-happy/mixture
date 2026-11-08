@@ -78,7 +78,7 @@ func (s *SerConnObj) TrySend(buf *[]byte) bool {
 	return s.TryEnqueue(s.sendChannel, buf)
 }
 
-// TryEnqueue 在关闭锁保护下向指定队列非阻塞入队，失败时由调用方回收缓冲区。
+// 在关闭锁保护下向指定队列非阻塞入队，失败时由调用方回收缓冲区。
 func (s *SerConnObj) TryEnqueue(ch chan *[]byte, buf *[]byte) bool {
 	s.closeMux.Lock()
 	defer s.closeMux.Unlock()

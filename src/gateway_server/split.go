@@ -15,7 +15,7 @@ func DealBufferData(newConn *NewConnection, readNum int, l *CutIndexList, sliceB
 	return true
 }
 
-// DoSplit /* 三种读取字节流切割方式： 1.根据字节长度来读取数据   2.根据标记来切割字节流  3定长读取，每个包都是固定长度*/
+// 三种读取字节流切割方式： 1.根据字节长度来读取数据   2.根据标记来切割字节流  3定长读取，每个包都是固定长度
 func DoSplit(j *ReadStreamBufferObject, byteSlice []byte, readNum int, list *CutIndexList, sliceBuffer []byte) bool {
 	switch j.readWay {
 	case 1:
