@@ -328,7 +328,7 @@ func SendGateIDToRemoteSer(cn *net.Conn, linkerName string) {
 	}
 
 	//打包数据发送给对应服务进程
-	dateByte = append(dateByte[:dataSize])
+	dateByte = dateByte[:dataSize]
 	protoNum := 0 //默认通知服务标识网关的协议号指定为0
 	dataIdxFrom := SessionIdLen + ProtoNumLen
 	dataSlice := make([]byte, len(dateByte)+HeadLen+dataIdxFrom)

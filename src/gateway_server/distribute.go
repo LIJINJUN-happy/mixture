@@ -84,7 +84,7 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 
 		//根据协议号来进行协议派发（包体中从4字节开始到6字节区间的数据，大端方式读取）
 		elementProtoNum := binary.BigEndian.Uint16(data[SessionIdLen : SessionIdLen+ProtoNumLen])
-		if int(elementProtoNum) >= math.MaxUint16 {
+		if int(elementProtoNum) >= len(ProtocolDistributeInfo.ProtoDistributeArray) {
 			printer.TextWarn("DoDistribute", "elementProtoNum out of range", elementProtoNum, "sourceSession", sourceSession)
 			DistributeDataPool.Put(bufPtr)
 			continue
@@ -116,11 +116,11 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 }
 
 type DistributeInfo struct {
-	ProtoNameMap         map[string]uint16      //协议名字对应协议号
-	ProtoNumArray        [math.MaxUint16]string //协议号对应协议名字
-	ProtoDistributeArray [math.MaxUint16]string //协议号对应转发的服务名
-	ProtocolType         string                 //协议类型（JSON还是PB）
-	ProtoVersion         string                 //协议版本号
+	ProtoNameMap         map[string]uint16          //协议名字对应协议号
+	ProtoNumArray        [math.MaxUint16 + 1]string //协议号对应协议名字，覆盖 uint16 全部取值
+	ProtoDistributeArray [math.MaxUint16 + 1]string //协议号对应转发的服务名
+	ProtocolType         string                     //协议类型（JSON还是PB）
+	ProtoVersion         string                     //协议版本号
 }
 
 type distributeConfigInfo struct {

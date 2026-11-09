@@ -177,12 +177,17 @@ func (streanBuff *ReadStreamBufferObject) Init(way uint8) {
 	streanBuff.byteData = make([]byte, 0, ReadStreamBufferSize)
 }
 
+// 按客户端协议的包长边界初始化切包状态。客户端包体只包含协议号和协议数据，不包含进程间传输使用的 sessionId。
+func (streanBuff *ReadStreamBufferObject) InitClient(way uint8) {
+	streanBuff.Init(way)
+	streanBuff.minPacketBodySize = uint16(ProtoNumLen)
+	streanBuff.maxPacketBodySize = MaxClientPacketBodySize
+}
+
 // 初始化NewConnection对象
 func (netObj *NewConnection) Init(way uint8, socketConn *net.Conn, wSocketConn *websocket.Conn, typeofConn string) {
 	rsbObject := new(ReadStreamBufferObject)
-	rsbObject.Init(way)
-	rsbObject.maxPacketBodySize = MaxClientPacketBodySize
-	rsbObject.minPacketBodySize = uint16(ProtoNumLen)
+	rsbObject.InitClient(way)
 	netObj.StreamBuffer = rsbObject
 	netObj.wsConn = wSocketConn
 	netObj.conn = socketConn
