@@ -23,4 +23,4 @@ way=1
 RobotProtoType=pb
 
 --机器人连接的服务器地址（IP:Port）
-RobotConnAddress=14.145.169.13:10230
+RobotConnAddress=113.45.222.72:7891
