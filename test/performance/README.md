@@ -34,17 +34,17 @@ go build -o test/performance/load.exe ./test/concurrent
 
 ## 3. 服务端观测（仅测试部署启用）
 
-在各进程完成模块及协议注册后调用；运行期间不要修改协议路由map：
+网关和 Actor 已分别在 `127.0.0.1:6060` 和 `127.0.0.1:6061` 启动观测接口。诊断包不直接依赖业务包，由各进程传入队列快照回调，避免 Go import cycle。其他进程需要接入时，在完成模块及协议注册后调用：
 
 ```go
 import "mixture/test/performance/observe"
 
-diagnostics, err := observe.Start("127.0.0.1:6060")
+diagnostics, err := observe.Start("127.0.0.1:6062")
 if err != nil { panic(err) }
 defer diagnostics.Close() // 放在保持运行的启动函数中，不能放在立即返回的初始化函数中
 ```
 
-不同进程使用不同端口，绑定回环地址。模板不会自动改动生产启动流程。
+不同进程使用不同端口，绑定回环地址。不传回调时 `protocol_queues` 为空，但堆、GC、goroutine 和 pprof 仍然可用。
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:6060/metrics | ConvertTo-Json -Depth 8
