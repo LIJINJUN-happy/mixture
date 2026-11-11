@@ -122,4 +122,12 @@ func robDealJSMsg(r *TestRobot, data []byte) {
 		}
 		fmt.Println(message.Name)
 	}
+	if protoName == "S2CBroadcast" {
+		message := new(mutual_json.S2CBroadcast)
+		if err := json.Unmarshal(data[gateway_server.ProtoNumLen:], message); err != nil {
+			fmt.Println("unmarshal S2CBroadcast failed:", err)
+			return
+		}
+		fmt.Println(message.Data)
+	}
 }

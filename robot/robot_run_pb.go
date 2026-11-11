@@ -118,6 +118,16 @@ func robDealPBMsg(r *TestRobot, data []byte) {
 		message := new(pb.S2CTestRet)
 		if err := proto.Unmarshal(data[gateway_server.ProtoNumLen:], message); err != nil {
 			fmt.Println("unmarshal S2CTestRet failed:", err)
+		} else {
+			fmt.Println("unmarshal S2CTestRet success, Num:", message.Num)
+		}
+	}
+	if protoName == "S2CBroadcast" {
+		message := new(pb.S2CBroadcast)
+		if err := proto.Unmarshal(data[gateway_server.ProtoNumLen:], message); err != nil {
+			fmt.Println("unmarshal S2CBroadcast failed:", err)
+		} else {
+			fmt.Println("unmarshal S2CBroadcast success, message.Data:", message.Data)
 		}
 	}
 }
