@@ -27,7 +27,7 @@ type BroadcastResult struct {
 }
 
 // 识别并消费广播内部协议；返回true表示bufPtr已在本函数内处理和回收。
-func tryHandleGateBroadcast(bufPtr *[]byte, sessionID uint32, protoNum uint16) bool {
+func TryHandleGateBroadcast(bufPtr *[]byte, sessionID uint32, protoNum uint16) bool {
 	protoName := ProtocolDistributeInfo.ProtoNumArray[protoNum]
 	if protoName == InternalBroadcastProtocolName {
 		if sessionID == 0 {

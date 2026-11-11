@@ -33,7 +33,7 @@ func SafeSendToLinker(linker *SerLinker, bufPtr *[]byte) {
 
 // 把 bufPtr 派发到目标客户端（sessionID）的写协程缓冲，任何失败路径内部 Put 归还池
 func SafeSendToGateClient(bufPtr *[]byte, sessionID uint32, protoNum uint16) {
-	if tryHandleGateBroadcast(bufPtr, sessionID, protoNum) {
+	if TryHandleGateBroadcast(bufPtr, sessionID, protoNum) {
 		return
 	}
 
