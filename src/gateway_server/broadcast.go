@@ -18,7 +18,7 @@ const (
 	ClientBroadcastProtocolName   = "S2CBroadcast"     // 客户端最终收到的广播协议。
 )
 
-// BroadcastResult 记录一次网关本地广播的投递结果。
+// 记录一次网关本地广播的投递结果。
 type BroadcastResult struct {
 	Targets int // 找到的目标连接数
 	Sent    int // 成功放入客户端写队列的数量
@@ -26,7 +26,7 @@ type BroadcastResult struct {
 	Invalid int // session字符串中无法转换的项目数量
 }
 
-// tryHandleGateBroadcast 识别并消费广播内部协议；返回true表示bufPtr已在本函数内处理和回收。
+// 识别并消费广播内部协议；返回true表示bufPtr已在本函数内处理和回收。
 func tryHandleGateBroadcast(bufPtr *[]byte, sessionID uint32, protoNum uint16) bool {
 	protoName := ProtocolDistributeInfo.ProtoNumArray[protoNum]
 	if protoName == InternalBroadcastProtocolName {
@@ -50,7 +50,7 @@ func tryHandleGateBroadcast(bufPtr *[]byte, sessionID uint32, protoNum uint16) b
 	return false
 }
 
-// BroadcastToGateClients 将同一业务包投递给当前网关内的目标客户端。
+// 将同一业务包投递给当前网关内的目标客户端。
 // sessionIDs为空时遍历全部在线连接，否则解析逗号分隔的sessionID；每个客户端独占一块池化缓冲区。
 func BroadcastToGateClients(sessionIDs string, protoNum uint16, payload []byte) BroadcastResult {
 	result := BroadcastResult{}
@@ -116,7 +116,7 @@ func BroadcastToGateClients(sessionIDs string, protoNum uint16, payload []byte) 
 	return result
 }
 
-// HandleGateBroadcast 解析内部广播协议并投递给当前网关内的目标客户端。
+// 解析内部广播协议并投递给当前网关内的目标客户端。
 func HandleGateBroadcast(data []byte) {
 	var sessionIDs string
 	var broadcastData, clientPayload []byte
