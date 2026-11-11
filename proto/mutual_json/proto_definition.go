@@ -9,3 +9,8 @@ type C2STest struct {
 type S2CTestRet struct {
 	Name string `json:"name"`
 }
+
+// 网关广播给客户端的协议。
+type S2CBroadcast struct {
+	Data []byte `json:"data"`
+}

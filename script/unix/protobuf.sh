@@ -13,6 +13,7 @@ onlyInteriorPb(){
   cd proto/interior_pb/pb_src
   protoc -I . --go_out=../   ./element.proto
   protoc -I . --go_out=../   ./hotfix_settings.proto
+  protoc -I . --go_out=../   ./gate_broadcast.proto
 }
 
 mutualProtocol(){
@@ -21,6 +22,7 @@ mutualProtocol(){
   # into dir ,Do Dispose with other xxx.proto file
   cd proto/mutual_pb/pb_src
   protoc -I . --go_out=../   ./test.proto
+  protoc -I . --go_out=../   ./client_broadcast.proto
 
   cd ../../../
   cd proto

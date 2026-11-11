@@ -1,0 +1,9 @@
+syntax = "proto3";
+package gate_broadcast;
+option go_package = "/ipb";
+
+// 服务进程发送给网关的广播指令。
+message S2SGateBroadcast {
+  string session_ids = 1; // 逗号分隔的sessionID；空字符串表示当前网关全部在线客户端
+  bytes data = 2;         // 由网关封装为S2CBroadcast后发送给客户端的数据
+}

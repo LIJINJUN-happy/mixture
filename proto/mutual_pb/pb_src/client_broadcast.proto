@@ -1,0 +1,8 @@
+syntax = "proto3";
+package client_broadcast;
+option go_package = "/pb";
+
+// 网关广播给客户端的协议。
+message S2CBroadcast {
+  bytes data = 1;
+}

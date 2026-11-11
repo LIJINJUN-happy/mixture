@@ -10,7 +10,8 @@
   ],
 
   "CS_gateway_server": [
-    "S2CTestRet"
+    "S2CTestRet",
+    "S2CBroadcast"
   ],
 
   "CS_web_server": [
@@ -32,5 +33,6 @@
   ],
 
   "SS_gateway_server": [
+    "S2SGateBroadcast"
   ]
 }

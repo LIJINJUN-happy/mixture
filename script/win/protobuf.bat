@@ -10,6 +10,7 @@ if %doCmd% EQU 1 (
     cd proto/interior_pb/pb_src
     protoc -I . --go_out=../   ./element.proto
     protoc -I . --go_out=../   ./hotfix_settings.proto
+    protoc -I . --go_out=../   ./gate_broadcast.proto
 
     echo "Dispose protocol  Finish"
     echo Press AnyKey To Continue...
@@ -24,6 +25,7 @@ if %doCmd% EQU 2 (
     rem into dir ,Do Dispose with other xxx.proto file
     cd proto/mutual_pb/pb_src
     protoc -I . --go_out=../   ./test.proto
+    protoc -I . --go_out=../   ./client_broadcast.proto
 	
 	rem 开始提取协议和协议号内容
 	cd ../../../

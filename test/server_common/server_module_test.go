@@ -4,6 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"google.golang.org/protobuf/proto"
+	"io"
+	"mixture/proto/interior_pb/ipb"
+	"mixture/proto/mutual_pb/pb"
 	"mixture/src/common/printer"
 	sc "mixture/src/common/server_common"
 	gw "mixture/src/gateway_server"
@@ -11,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"sync"
 	"testing"
 	"time"
@@ -147,6 +152,141 @@ func TestConnectionPacketLimits(t *testing.T) {
 	}
 }
 
+func testGatewayBroadcast(t *testing.T) {
+	newClient := func() (*gw.NewConnection, net.Conn, uint32) {
+		before := make(map[uint32]struct{})
+		gw.GateClientMap.Range(func(key, _ any) bool {
+			before[key.(uint32)] = struct{}{}
+			return true
+		})
+		local, remote := net.Pipe()
+		conn := new(gw.NewConnection)
+		conn.Init(1, &local, nil, "tcp")
+		conn.AddIntoGateMap()
+		var sessionID uint32
+		gw.GateClientMap.Range(func(key, _ any) bool {
+			id := key.(uint32)
+			if _, existed := before[id]; !existed {
+				sessionID = id
+				return false
+			}
+			return true
+		})
+		if sessionID == 0 {
+			t.Fatal("client session was not registered")
+		}
+		return conn, remote, sessionID
+	}
+	readPacket := func(conn net.Conn) []byte {
+		t.Helper()
+		if err := conn.SetReadDeadline(time.Now().Add(time.Second)); err != nil {
+			t.Fatal(err)
+		}
+		header := make([]byte, gw.HeadLen)
+		if _, err := io.ReadFull(conn, header); err != nil {
+			t.Fatal(err)
+		}
+		body := make([]byte, binary.BigEndian.Uint16(header))
+		if _, err := io.ReadFull(conn, body); err != nil {
+			t.Fatal(err)
+		}
+		return body
+	}
+
+	client1, remote1, session1 := newClient()
+	client2, remote2, _ := newClient()
+	defer func() {
+		client1.Close()
+		client2.Close()
+		remote1.Close()
+		remote2.Close()
+	}()
+	go gw.DoWriteMsg(client1)
+	go gw.DoWriteMsg(client2)
+
+	payload := []byte("broadcast")
+	broadcastProtoNum := gw.ProtocolDistributeInfo.ProtoNameMap[gw.InternalBroadcastProtocolName]
+	clientBroadcastProtoNum := gw.ProtocolDistributeInfo.ProtoNameMap[gw.ClientBroadcastProtocolName]
+	broadcastData, err := proto.Marshal(&ipb.S2SGateBroadcast{Data: payload})
+	if err != nil {
+		t.Fatal(err)
+	}
+	packet := make([]byte, gw.SessionIdLen+gw.ProtoNumLen+len(broadcastData))
+	binary.BigEndian.PutUint16(packet[gw.SessionIdLen:gw.SessionIdLen+gw.ProtoNumLen], broadcastProtoNum)
+	copy(packet[gw.SessionIdLen+gw.ProtoNumLen:], broadcastData)
+	var cuts gw.CutIndexList
+	cuts.Push(len(packet))
+	gw.DoDistribute(&cuts, packet, 0)
+	for index, remote := range []net.Conn{remote1, remote2} {
+		body := readPacket(remote)
+		if len(body) < gw.ProtoNumLen || binary.BigEndian.Uint16(body[:gw.ProtoNumLen]) != clientBroadcastProtoNum {
+			t.Fatalf("client %d received invalid packet %v", index+1, body)
+		}
+		message := new(pb.S2CBroadcast)
+		if err := proto.Unmarshal(body[gw.ProtoNumLen:], message); err != nil || !bytes.Equal(message.Data, payload) {
+			t.Fatalf("client %d received invalid broadcast: message=%v err=%v", index+1, message, err)
+		}
+	}
+
+	// 客户端来源带有非零sourceSession，不能伪造内部广播协议。
+	clientPacket := make([]byte, gw.ProtoNumLen+len(broadcastData))
+	binary.BigEndian.PutUint16(clientPacket[:gw.ProtoNumLen], broadcastProtoNum)
+	copy(clientPacket[gw.ProtoNumLen:], broadcastData)
+	cuts.Reset()
+	cuts.Push(len(clientPacket))
+	gw.DoDistribute(&cuts, clientPacket, session1)
+	if err := remote1.SetReadDeadline(time.Now().Add(30 * time.Millisecond)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := remote1.Read(make([]byte, 1)); err == nil {
+		t.Fatal("client-forged broadcast was delivered")
+	}
+	remote1.SetReadDeadline(time.Time{})
+
+	targetPayload, err := proto.Marshal(&pb.S2CBroadcast{Data: []byte("target")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := gw.BroadcastToGateClients(fmt.Sprintf("%d,%d,bad,4294967295", session1, session1), clientBroadcastProtoNum, targetPayload)
+	if result.Targets != 1 || result.Sent != 1 || result.Dropped != 1 || result.Invalid != 1 {
+		t.Fatalf("target broadcast result=%+v", result)
+	}
+	if body := readPacket(remote1); binary.BigEndian.Uint16(body[:gw.ProtoNumLen]) != clientBroadcastProtoNum {
+		t.Fatalf("target client received invalid protocol %v", body)
+	} else {
+		message := new(pb.S2CBroadcast)
+		if err := proto.Unmarshal(body[gw.ProtoNumLen:], message); err != nil || !bytes.Equal(message.Data, []byte("target")) {
+			t.Fatalf("target client received invalid packet %v", body)
+		}
+	}
+	if err := remote2.SetReadDeadline(time.Now().Add(30 * time.Millisecond)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := remote2.Read(make([]byte, 1)); err == nil {
+		t.Fatal("non-target client received targeted broadcast")
+	}
+	remote2.SetReadDeadline(time.Time{})
+
+	slowClient, slowRemote, slowSession := newClient()
+	defer slowRemote.Close()
+	for {
+		buf := gw.DistributeDataPool.Get().(*[]byte)
+		*buf = (*buf)[:8]
+		if slowClient.TrySend(buf) {
+			continue
+		}
+		*buf = (*buf)[:cap(*buf)]
+		gw.DistributeDataPool.Put(buf)
+		break
+	}
+	result = gw.BroadcastToGateClients(strconv.FormatUint(uint64(slowSession), 10), clientBroadcastProtoNum, targetPayload)
+	if result.Targets != 1 || result.Sent != 0 || result.Dropped != 1 {
+		t.Fatalf("slow client broadcast result=%+v", result)
+	}
+	go gw.DoWriteMsg(slowClient)
+	slowClient.Close()
+}
+
 // Run in a child process so Windows releases the framework's log handles
 // before the parent removes the temporary working directory.
 func TestSynchronousModuleCall(t *testing.T) {
@@ -171,6 +311,7 @@ func TestSynchronousModuleCall(t *testing.T) {
 	}
 	printer.InitPrinterMgr()
 	printer.SetLoggerObj(printer.CreateLogger("test", "log/", false))
+	t.Run("gateway broadcast", testGatewayBroadcast)
 	t.Run("linker writer stop and socket failure", func(t *testing.T) {
 		for _, failHandshake := range []bool{false, true} {
 			local, remote := net.Pipe()
