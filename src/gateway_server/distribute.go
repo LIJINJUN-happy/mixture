@@ -33,25 +33,29 @@ func SafeSendToLinker(linker *SerLinker, bufPtr *[]byte) {
 
 // 把 bufPtr 派发到目标客户端（sessionID）的写协程缓冲，任何失败路径内部 Put 归还池
 func SafeSendToGateClient(bufPtr *[]byte, sessionID uint32, protoNum uint16) {
-	if TryHandleGateBroadcast(bufPtr, sessionID, protoNum) {
+	protoName := ProtocolDistributeInfo.ProtoNumArray[protoNum]
+	sysMsg := strings.HasPrefix(protoName, "S2S") //系统间的协议消息(S2S)不可以发送给客户端
+	if sysMsg && (sessionID == 0) {
+		printer.TextDebug("DoDistribute Check serFunc", "protoName", protoName)
+		switch protoName {
+		case InternalBroadcastProtocolName:
+			HandleGateBroadcast((*bufPtr)[SessionIdLen+ProtoNumLen:])
+		case "xxxx":
+		case "xxxxx":
+		default:
+		}
+		*bufPtr = (*bufPtr)[:cap(*bufPtr)]
+		DistributeDataPool.Put(bufPtr)
 		return
 	}
 
-	if client, ok := GateClientMap.Load(sessionID); ok {
+	if client, ok := GateClientMap.Load(sessionID); ok && (!sysMsg) {
 		if session, isSession := client.(*clientSession); isSession {
 			if session.connection.TrySend(bufPtr) {
 				return // 成功投递，bufPtr 由接收方回收
 			} else {
 				printer.TextWarn("DoDistribute", "Client Closed Or Buffer Full, Drop Msg SessionID", sessionID)
 			}
-		}
-	} else if sessionID == 0 {
-		protoName := ProtocolDistributeInfo.ProtoNumArray[protoNum]
-		printer.TextDebug("DoDistribute Check serFunc", "protoName", protoName)
-		switch protoName {
-		case "xxxx":
-		case "xxxxx":
-		default:
 		}
 	}
 	*bufPtr = (*bufPtr)[:cap(*bufPtr)]

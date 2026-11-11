@@ -26,30 +26,6 @@ type BroadcastResult struct {
 	Invalid int // session字符串中无法转换的项目数量
 }
 
-// 识别并消费广播内部协议；返回true表示bufPtr已在本函数内处理和回收。
-func TryHandleGateBroadcast(bufPtr *[]byte, sessionID uint32, protoNum uint16) bool {
-	protoName := ProtocolDistributeInfo.ProtoNumArray[protoNum]
-	if protoName == InternalBroadcastProtocolName {
-		if sessionID == 0 {
-			HandleGateBroadcast((*bufPtr)[SessionIdLen+ProtoNumLen:])
-		} else {
-			printer.TextWarn("SafeSendToGateClient Reject Client Broadcast", "sessionID", sessionID)
-		}
-		*bufPtr = (*bufPtr)[:cap(*bufPtr)]
-		DistributeDataPool.Put(bufPtr)
-		return true
-	}
-
-	// 其他S2S内部协议也不能作为普通消息投递给客户端。
-	if sessionID > 0 && strings.HasPrefix(protoName, "S2S") {
-		printer.TextWarn("SafeSendToGateClient Reject S2S Protocol", "protoName", protoName, "sessionID", sessionID)
-		*bufPtr = (*bufPtr)[:cap(*bufPtr)]
-		DistributeDataPool.Put(bufPtr)
-		return true
-	}
-	return false
-}
-
 // 将同一业务包投递给当前网关内的目标客户端。
 // sessionIDs为空时遍历全部在线连接，否则解析逗号分隔的sessionID；每个客户端独占一块池化缓冲区。
 func BroadcastToGateClients(sessionIDs string, protoNum uint16, payload []byte) BroadcastResult {
