@@ -70,7 +70,7 @@ func DoWriteMsg(newConn *NewConnection) {
 			*current = (*current)[:cap(*current)]
 			DistributeDataPool.Put(current)
 		}
-		newConn.drainWriteQueue()
+		newConn.DrainWriteQueue()
 		clientWriteGoroutineNum.Add(-1) //写协程数量同步变动减少
 	}()
 

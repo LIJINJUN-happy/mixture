@@ -329,7 +329,7 @@ func (netObj *NewConnection) TrySend(buf *[]byte) bool {
 }
 
 // Close禁止入队后，仅由写协程清理剩余缓冲区。
-func (netObj *NewConnection) drainWriteQueue() {
+func (netObj *NewConnection) DrainWriteQueue() {
 	for {
 		select {
 		case buf := <-netObj.writeChan:
