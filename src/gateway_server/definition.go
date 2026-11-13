@@ -21,7 +21,6 @@ const (
 	ReadStreamBufferSize             = 5120              //字节流读取对象的已读书缓存长度(1024 * 5 )
 	ReadStreamBufferObjectWay uint8  = 1                 //字节流切割方式
 	MaxConnectClientNum              = 10000             //最大客户端同时连接数量
-	messageType               int    = 1                 //webSocket的消息类型（默认为1文本类型）
 	maxGateRebuildListenTimes int32  = 10                //网关监听最大重启次数
 	splitSign                        = 124               //字节流切割的标识符（’|’）
 	appointLen                uint16 = 556               //定长读取字节流的长度
@@ -29,6 +28,7 @@ const (
 	ConnReadTimeout                  = 180 * time.Second //读取用户超时间隔（为了防止长时间无响应的情况）
 	IntervalLoopingTime              = 30 * time.Second
 	GoroutineSyncBreakSign           = "_CLOSE"
+	messageType                      = websocket.BinaryMessage //协议包包含二进制包头和可能非UTF-8 的载荷,WebSocket回包使用二进制帧
 )
 
 const (
