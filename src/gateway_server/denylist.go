@@ -26,24 +26,24 @@ const (
 
 // 记录某个 IP 在当前时间窗口内首次违规时间和累计次数。
 type DenyListStrike struct {
-	first time.Time
-	count int
+	first time.Time // 当前统计窗口内首次收到非法包的时间
+	count int       // 当前统计窗口内收到的非法包次数
 }
 
-// 是写入 JSON 的封禁记录，包含原因和到期时间。
+// 写入JSON的封禁记录，包含原因和到期时间。
 type DenyListBan struct {
-	Reason    string    `json:"reason"`
-	ExpiresAt time.Time `json:"expiresAt"`
+	Reason    string    `json:"reason"`    // 封禁原因，写入 JSON 供排查
+	ExpiresAt time.Time `json:"expiresAt"` // 封禁到期时间；到期后允许重新连接
 }
 
 // 管理运行期违规次数、封禁状态及持久化通知。
 type DenyListStore struct {
-	mu      sync.Mutex
-	writeMu sync.Mutex
-	path    string
-	strikes map[string]DenyListStrike
-	bans    map[string]DenyListBan
-	changed chan struct{}
+	mu      sync.Mutex                // 保护 strikes 和 bans 两张内存表
+	writeMu sync.Mutex                // 串行化写盘，避免并发替换 JSON 文件
+	path    string                    // denylist.json 的完整路径
+	strikes map[string]DenyListStrike // IP 到当前窗口违规次数的映射，仅保存在内存中
+	bans    map[string]DenyListBan    // IP 到封禁记录的映射，定期写入 JSON
+	changed chan struct{}             // 合并多次变更，通知后台协程写盘
 }
 
 // 当前网关进程使用的 IP 封禁表，启动初始化后供接入和读协程共享。
