@@ -42,6 +42,9 @@ func Run() {
 	BeginLinkServer(InteractiveSerLinker)
 
 	Looping()
+	if err := ClientDenyList.Flush(); err != nil {
+		printer.TextError("Persist denylist on shutdown failed", "err", err)
+	}
 }
 
 func DoInit(db *sql.DB) error {
@@ -69,6 +72,9 @@ func DoInit(db *sql.DB) error {
 		return fmt.Errorf("whiteIPListDefaultStatus Error Status %v", whiteStatus)
 	}
 	printer.TextInfo("DoInit", "WhiteList Init Map Info", WhiteListPtr.whiteMap, "Active", WhiteListPtr.IsActive)
+	if err := InitClientDenyList(); err != nil {
+		return err
+	}
 
 	GateInfo.sessionIdDistributionRecord.Store(0)
 	GateInfo.rebuildListenSec = 3

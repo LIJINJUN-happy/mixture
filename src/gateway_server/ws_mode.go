@@ -36,7 +36,7 @@ func BeginWebSocketSer() {
 
 // 注意：gorilla/websocket库中的Respond会自动创建一个Goroutine来处理请求,所以无需像beginTcpSer一样再创建2个协程来读写分离
 func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
-	if !WhiteListPtr.CheckWhiteIP(r.RemoteAddr) {
+	if !WhiteListPtr.CheckWhiteIP(r.RemoteAddr) || ClientDenyList.IsDenied(r.RemoteAddr) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return // 在 Upgrade 前完成准入，连接满时不再建立 WebSocket 会话。
 	}
@@ -112,6 +112,9 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 			//printer.TextInfo("doUpgradeWS", "num", num, "message", string(newConn.ReadBuf[:num]))
 			if !DealBufferData(newConn, num, &cutList, sliceBuffer) {
 				printer.TextWarn("DoUpgradeWS", "Illegal packet, closing connection", (*newConn).RemoteAddr().String())
+				if ClientDenyList.RecordInvalidPacket((*newConn).RemoteAddr().String()) {
+					printer.TextWarn("Denylist blocked client IP", "remoteAddr", (*newConn).RemoteAddr().String())
+				}
 				return
 			}
 			if waitingFirstPacket && cutList.Len() > 0 {

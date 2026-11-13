@@ -30,7 +30,7 @@ func BeginTcpSer() {
 			printer.TextError("Accept Connect Error", "acceptErr", acceptErr.Error())
 		} else {
 			//白名单过滤
-			if !WhiteListPtr.CheckWhiteIP(conn.RemoteAddr().String()) {
+			if !WhiteListPtr.CheckWhiteIP(conn.RemoteAddr().String()) || ClientDenyList.IsDenied(conn.RemoteAddr().String()) {
 				conn.Close()
 				continue
 			}
@@ -143,6 +143,9 @@ func DoReadMsg(newConn *NewConnection) {
 			printer.TextDebug("doReadMsg", "num", num, "message", string(newConn.ReadBuf[:num]))
 			if !DealBufferData(newConn, num, &cutList, sliceBuffer) {
 				printer.TextWarn("DoReadMsg", "Illegal packet, closing connection", (*newConn).RemoteAddr().String())
+				if ClientDenyList.RecordInvalidPacket((*newConn).RemoteAddr().String()) {
+					printer.TextWarn("Denylist blocked client IP", "remoteAddr", (*newConn).RemoteAddr().String())
+				}
 				return
 			}
 			//判断是否成功切出第一个包
