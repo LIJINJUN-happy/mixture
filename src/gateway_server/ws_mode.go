@@ -23,7 +23,11 @@ func BeginWebSocketSer() {
 	strBuild.WriteString(address)
 	strBuild.WriteString(" ...")
 	printer.TextInfo(strBuild.String())
-	err := http.ListenAndServe(address[:addrLen], nil) //默认监听本地,“:端口号”
+	server := &http.Server{
+		Addr:              address[:addrLen],
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	err := server.ListenAndServe() // 限制 Upgrade 前 HTTP 请求头读取时间，防止慢速请求长期占用连接。
 	if err != nil {
 		printer.TextError("Error Starting Gate_Server With WS Mode", "err", err)
 		panic("Listen Address Error: " + address)
