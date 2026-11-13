@@ -2,6 +2,7 @@ package server_common
 
 import (
 	"errors"
+	"fmt"
 	"mixture/src/common/printer"
 	"mixture/src/gateway_server"
 	"os"
@@ -73,19 +74,21 @@ func CreateMod(modName string, chanSize int, modInitFunc, serverDownFunc func() 
 	newMod.closeChan = make(chan os.Signal, 1)
 	signal.Notify(newMod.closeChan, syscall.SIGINT, syscall.SIGTERM) // 注册需要监听的信号
 
-	//初始化模块
-	kickRes := newMod.ModInit()
-	if kickRes != nil {
-		printer.PanicStack(kickRes)
-		return nil
-	}
-
 	//初始化日志对象
 	if l := printer.CreateLogger(modName, "log/moduleLog/", false); l != nil {
 		newMod.LoggerObj = l
 	} else {
 		err := errors.New("CreateLogger Logger Failed, ModName: " + modName)
 		printer.PanicStack(err)
+		return nil
+	}
+
+	//初始化模块
+	kickRes := newMod.ModInit()
+	if kickRes != nil {
+		signal.Stop(newMod.closeChan)
+		errMsg := fmt.Errorf("ModInit failed, modName=%s: %w", modName, kickRes)
+		printer.PanicStack(errMsg)
 		return nil
 	}
 
