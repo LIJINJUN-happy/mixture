@@ -114,8 +114,12 @@ func DoReadMsg(newConn *NewConnection) {
 	sliceBuffer := make([]byte, int(MaxPacketBodySize)+ConnReadBufSize) //上一包残留 + 本次Read
 	var cutList CutIndexList
 	for {
-		//设置下次读取的超时时间
+		waitingFirstPacket := !newConn.firstPacketReceived
 		dLineTime := time.Now().Add(ConnReadTimeout)
+		if waitingFirstPacket {
+			// 假如没收到过完整的协议包,设置超时时间，防止恶意长期连接不发送协议占用资源
+			dLineTime = newConn.firstPacketDeadline
+		}
 		err := (*(newConn.conn)).SetReadDeadline(dLineTime)
 		if err != nil {
 			printer.TextError("Socket SetReadDeadline", "Error", err.Error())
@@ -126,6 +130,8 @@ func DoReadMsg(newConn *NewConnection) {
 		if readError != nil {
 			if checkRes, descString := CheckIsCloseByRemote(readError); checkRes {
 				printer.TextInfo("Conn Close With Client", "descString", descString)
+			} else if CheckIsReadTimeOut(readError) && waitingFirstPacket {
+				printer.TextInfo("First Packet Timeout", "RemoteAddr", (*newConn).RemoteAddr().String())
 			} else if CheckIsReadTimeOut(readError) {
 				printer.TextInfo("Read Timeout", "RemoteAddr", (*newConn).RemoteAddr().String())
 			} else {
@@ -138,6 +144,10 @@ func DoReadMsg(newConn *NewConnection) {
 			if !DealBufferData(newConn, num, &cutList, sliceBuffer) {
 				printer.TextWarn("DoReadMsg", "Illegal packet, closing connection", (*newConn).RemoteAddr().String())
 				return
+			}
+			//判断是否成功切出第一个包
+			if waitingFirstPacket && cutList.Len() > 0 {
+				newConn.firstPacketReceived = true
 			}
 		}
 	}

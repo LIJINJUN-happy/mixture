@@ -284,7 +284,8 @@ func BeginGateServer() {
 }
 
 func Looping() {
-	loopTimer := time.NewTimer(IntervalLoopingTime)
+	intervalLoopingTime := 30 * time.Second
+	loopTimer := time.NewTimer(intervalLoopingTime)
 	defer loopTimer.Stop()
 
 	sigChannel := make(chan os.Signal, 1)
@@ -301,7 +302,7 @@ func Looping() {
 		case <-loopTimer.C:
 			printer.TextInfo("ClientGoroutine Statistics", "Read-Goroutine", clientReadGoroutineNum.Load(), "Write-Goroutine", clientWriteGoroutineNum.Load())
 			loopTimer.Stop()
-			loopTimer.Reset(IntervalLoopingTime)
+			loopTimer.Reset(intervalLoopingTime)
 		}
 	}
 }

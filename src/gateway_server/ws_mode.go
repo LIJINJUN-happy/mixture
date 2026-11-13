@@ -84,8 +84,11 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 	sliceBuffer := make([]byte, int(MaxPacketBodySize)+ConnReadBufSize) //超过输出容量时切包返回false
 	var cutList CutIndexList
 	for {
-		//设置读取的超时时间
+		waitingFirstPacket := !newConn.firstPacketReceived
 		dLineTime := time.Now().Add(ConnReadTimeout)
+		if waitingFirstPacket {
+			dLineTime = newConn.firstPacketDeadline
+		}
 		err := newConn.wsConn.SetReadDeadline(dLineTime)
 		if err != nil {
 			printer.TextError("WebSocket SetReadDeadline", "Error", err.Error())
@@ -96,6 +99,8 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 		if readError != nil {
 			if checkRes, descString := CheckIsCloseByRemote(readError); checkRes {
 				printer.TextInfo("Conn Close With Client", "descString", descString)
+			} else if CheckIsReadTimeOut(readError) && waitingFirstPacket {
+				printer.TextWarn("First Packet Timeout", "RemoteAddr", (*newConn).RemoteAddr().String())
 			} else if CheckIsReadTimeOut(readError) {
 				printer.TextWarn("Read Timeout", "RemoteAddr", (*newConn).RemoteAddr().String())
 			} else {
@@ -108,6 +113,9 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 			if !DealBufferData(newConn, num, &cutList, sliceBuffer) {
 				printer.TextWarn("DoUpgradeWS", "Illegal packet, closing connection", (*newConn).RemoteAddr().String())
 				return
+			}
+			if waitingFirstPacket && cutList.Len() > 0 {
+				newConn.firstPacketReceived = true
 			}
 		}
 	}

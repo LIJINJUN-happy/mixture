@@ -16,19 +16,19 @@ import (
 )
 
 const (
-	ConnReadBufSize                  = 4096              //每次读取客户端传来的数据长度大小
-	ConnWriteChanCaps                = 64                //写信道缓存容量
-	ReadStreamBufferSize             = 5120              //字节流读取对象的已读书缓存长度(1024 * 5 )
-	ReadStreamBufferObjectWay uint8  = 1                 //字节流切割方式
-	MaxConnectClientNum              = 10000             //最大客户端同时连接数量
-	maxGateRebuildListenTimes int32  = 10                //网关监听最大重启次数
-	splitSign                        = 124               //字节流切割的标识符（’|’）
-	appointLen                uint16 = 556               //定长读取字节流的长度
-	channelBufferSize                = 2048              //channelArray中每个chan的缓存大小
-	ConnReadTimeout                  = 180 * time.Second //读取用户超时间隔（为了防止长时间无响应的情况）
-	IntervalLoopingTime              = 30 * time.Second
+	ConnReadBufSize                  = 4096  //每次读取客户端传来的数据长度大小
+	ConnWriteChanCaps                = 64    //写信道缓存容量
+	ReadStreamBufferSize             = 5120  //字节流读取对象的已读书缓存长度(1024 * 5 )
+	ReadStreamBufferObjectWay uint8  = 1     //字节流切割方式
+	MaxConnectClientNum              = 10000 //最大客户端同时连接数量
+	maxGateRebuildListenTimes int32  = 10    //网关监听最大重启次数
+	splitSign                        = 124   //字节流切割的标识符（’|’）
+	appointLen                uint16 = 556   //定长读取字节流的长度
+	channelBufferSize                = 2048  //channelArray中每个chan的缓存大小
 	GoroutineSyncBreakSign           = "_CLOSE"
-	messageType                      = websocket.BinaryMessage //协议包包含二进制包头和可能非UTF-8 的载荷,WebSocket回包使用二进制帧
+	MessageType                      = websocket.BinaryMessage //协议包包含二进制包头和可能非UTF-8 的载荷,WebSocket回包使用二进制帧
+	FirstPacketTimeout               = 10 * time.Second        //客户端连接后首个完整协议包的最长等待时间（防止恶意连接长期占用端口）
+	ConnReadTimeout                  = 180 * time.Second       //读取用户超时间隔（为了防止长时间无响应的情况）
 )
 
 const (
@@ -123,21 +123,23 @@ type WhiteList struct {
 
 // NewConnection for Client Connect Object conn对象结构
 type NewConnection struct {
-	connSession  uint32
-	connType     string
-	connTime     time.Time
-	conn         *net.Conn       //socket对象(tcp模式)
-	wsConn       *websocket.Conn //socket对象(ws模式)
-	ReadBuf      []byte          //socket读取的数据存放切片
-	writeChan    chan *[]byte    //socket获取数据的通信道（来自其他进程进程的数据）
-	ipString     string          //网络地址
-	StreamBuffer *ReadStreamBufferObject
-	closeMux     sync.RWMutex  //入队持读锁，关闭和会话注册持写锁
-	closed       bool          //是否停止入队，由closeMux保护
-	closeSign    chan struct{} //关闭时通知写协程退出
-	closeOnce    sync.Once     //保证关闭socket和移除会话只执行一次
-	closeErr     error         //保存关闭结果，通过closeOnce同步访问
-	slotReserved bool          //连接已经预留总连接名额，关闭时归还
+	connSession         uint32
+	connType            string
+	connTime            time.Time
+	conn                *net.Conn       //socket对象(tcp模式)
+	wsConn              *websocket.Conn //socket对象(ws模式)
+	ReadBuf             []byte          //socket读取的数据存放切片
+	writeChan           chan *[]byte    //socket获取数据的通信道（来自其他进程进程的数据）
+	ipString            string          //网络地址
+	StreamBuffer        *ReadStreamBufferObject
+	closeMux            sync.RWMutex  //入队持读锁，关闭和会话注册持写锁
+	closed              bool          //是否停止入队，由closeMux保护
+	closeSign           chan struct{} //关闭时通知写协程退出
+	closeOnce           sync.Once     //保证关闭socket和移除会话只执行一次
+	closeErr            error         //保存关闭结果，通过closeOnce同步访问
+	slotReserved        bool          //连接已经预留总连接名额，关闭时归还 (避免了重复释放和漏释放)
+	firstPacketDeadline time.Time     //首个完整协议包的固定截止时间，不因收到残片而延长
+	firstPacketReceived bool          //首个完整且格式合法的协议包是否已收到，仅由读协程访问
 }
 
 // SerLinker进程连接器（和其他服务进程的链接对象）
@@ -209,6 +211,7 @@ func (netObj *NewConnection) Init(way uint8, socketConn *net.Conn, wSocketConn *
 	netObj.connSession = 0
 	netObj.connType = typeofConn
 	netObj.connTime = time.Now()
+	netObj.firstPacketDeadline = netObj.connTime.Add(FirstPacketTimeout)
 	netObj.ReadBuf = make([]byte, ConnReadBufSize)
 	netObj.writeChan = make(chan *[]byte, ConnWriteChanCaps)
 	netObj.closeSign = make(chan struct{})
@@ -273,7 +276,7 @@ func (netObj *NewConnection) Write(b []byte) (n int, err error) {
 	}
 
 	//websocket.Write
-	return len(b), (netObj.wsConn).WriteMessage(messageType, b)
+	return len(b), (netObj.wsConn).WriteMessage(MessageType, b)
 }
 
 func (netObj *NewConnection) Read() (int, []byte, error) {
