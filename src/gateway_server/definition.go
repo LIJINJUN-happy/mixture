@@ -58,6 +58,20 @@ var GateInfo = new(GateInformation)
 // IO/协程数量
 var clientReadGoroutineNum = new(atomic.Int32)
 var clientWriteGoroutineNum = new(atomic.Int32)
+var activeClientConnections = new(atomic.Int32)
+
+// 接入前原子预留客户端名额，避免 TCP 和 WebSocket 在突发连接时共同越过上限。
+func ReserveClientConnection() bool {
+	for {
+		current := activeClientConnections.Load()
+		if current >= GateInfo.maxConnSize {
+			return false
+		}
+		if activeClientConnections.CompareAndSwap(current, current+1) {
+			return true
+		}
+	}
+}
 
 // WebSocket定义的全局结构对象
 var upgrade = websocket.Upgrader{
@@ -123,6 +137,7 @@ type NewConnection struct {
 	closeSign    chan struct{} //关闭时通知写协程退出
 	closeOnce    sync.Once     //保证关闭socket和移除会话只执行一次
 	closeErr     error         //保存关闭结果，通过closeOnce同步访问
+	slotReserved bool          //连接已经预留总连接名额，关闭时归还
 }
 
 // SerLinker进程连接器（和其他服务进程的链接对象）
@@ -140,7 +155,7 @@ type GateInformation struct {
 	workMode                    string        //tcp or ws(webSocket)
 	protocol                    string        //json or protobuf
 	streamBufferDealWay         uint8         //切割数据流方式(作用于客户端和Gate之间)
-	maxConnSize                 int32         //接收客户端数据协程最大并发数量
+	maxConnSize                 int32         //客户端连接数上限 (TCP与WebSocket共用)
 	rebuildListenTimes          atomic.Int32  //重启次数（太多次直接Exit）
 	rebuildListenSec            time.Duration //重新启动监听延迟（监听panic后重启监听的间隔时间）
 	sessionIdDistributionRecord atomic.Uint32 //当前派发的SessionID（每次有新连接进来都会派发一个新的sessionID作为标识）
@@ -288,6 +303,9 @@ func (netObj *NewConnection) Close() error {
 			netObj.closeErr = netObj.wsConn.Close()
 		}
 		netObj.ReduceFromGateMap()
+		if netObj.slotReserved {
+			activeClientConnections.Add(-1)
+		}
 	})
 	return netObj.closeErr
 }

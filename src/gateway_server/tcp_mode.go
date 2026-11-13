@@ -36,8 +36,7 @@ func BeginTcpSer() {
 			}
 
 			printer.TextDebug("Accept Connect Success", "conn", conn)
-			nowCount := clientReadGoroutineNum.Load()
-			if nowCount >= GateInfo.maxConnSize {
+			if !ReserveClientConnection() {
 				closeError := conn.Close()
 				if closeError != nil {
 					printer.TextDebug("conn.Close() Error With BeginTcpSer Accept", closeError.Error())
@@ -49,6 +48,7 @@ func BeginTcpSer() {
 			//当有客户端连接进来就创一个newConnection对象,并创建一个goroutine来执行客户端请求和回应
 			newConn := new(NewConnection)
 			newConn.Init(GateInfo.streamBufferDealWay, &conn, nil, "tcp")
+			newConn.slotReserved = true
 
 			//每个Actor连接读写分离
 			newConn.AddIntoGateMap()

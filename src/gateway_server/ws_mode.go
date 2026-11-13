@@ -36,23 +36,36 @@ func BeginWebSocketSer() {
 
 // 注意：gorilla/websocket库中的Respond会自动创建一个Goroutine来处理请求,所以无需像beginTcpSer一样再创建2个协程来读写分离
 func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
+	if !WhiteListPtr.CheckWhiteIP(r.RemoteAddr) {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return // 在 Upgrade 前完成准入，连接满时不再建立 WebSocket 会话。
+	}
+	if !ReserveClientConnection() {
+		http.Error(w, "too many connections", http.StatusServiceUnavailable)
+		return
+	}
+	needReleaseReservation := true //是否需要需归还连接名额
+	defer func() {
+		if needReleaseReservation {
+			activeClientConnections.Add(-1)
+		}
+	}()
+
 	wsConn, errUpgrade := upgrade.Upgrade(w, r, nil)
 	if errUpgrade != nil {
 		printer.TextError("Failed To Set up WebSocket Connection", "errUpgrade", errUpgrade)
 		return
 	}
 
-	//白名单过滤
-	if !WhiteListPtr.CheckWhiteIP(wsConn.RemoteAddr().String()) {
-		wsConn.Close()
-		return
-	}
 	// 限制单条WS消息（包含全部分片）的应用数据总长度，避免ReadMessage无限制分配内存。
 	wsConn.SetReadLimit(int64(MaxClientPacketSize))
 	printer.TextInfo("Upgraded WebSocket Connection Successfully")
 
+	//创建且初始化conn对象
 	newConn := new(NewConnection)
 	newConn.Init(GateInfo.streamBufferDealWay, nil, wsConn, "ws")
+	newConn.slotReserved = true
+	needReleaseReservation = false //后续通过close归还连接名额
 	clientReadGoroutineNum.Add(1)
 	newConn.AddIntoGateMap()
 
