@@ -32,9 +32,7 @@ func SafeSendToLinker(linker *SerLinker, bufPtr *[]byte) {
 }
 
 // 把 bufPtr 派发到目标客户端（sessionID）的写协程缓冲，任何失败路径内部 Put 归还池
-func SafeSendToGateClient(bufPtr *[]byte, sessionID uint32, protoNum uint16) {
-	protoName := ProtocolDistributeInfo.ProtoNumArray[protoNum]
-	sysMsg := strings.HasPrefix(protoName, "S2S") //系统间的协议消息(S2S)不可以发送给客户端
+func SafeSendToGateClient(bufPtr *[]byte, sessionID uint32, protoName string, sysMsg bool) {
 	if sysMsg && (sessionID == 0) {
 		printer.TextDebug("DoDistribute Check serFunc", "protoName", protoName)
 		switch protoName {
@@ -44,12 +42,7 @@ func SafeSendToGateClient(bufPtr *[]byte, sessionID uint32, protoNum uint16) {
 		case "xxxxx":
 		default:
 		}
-		*bufPtr = (*bufPtr)[:cap(*bufPtr)]
-		DistributeDataPool.Put(bufPtr)
-		return
-	}
-
-	if client, ok := GateClientMap.Load(sessionID); ok && (!sysMsg) {
+	} else if client, ok := GateClientMap.Load(sessionID); ok && (!sysMsg) {
 		if session, isSession := client.(*clientSession); isSession {
 			if session.connection.TrySend(bufPtr) {
 				return // 成功投递，bufPtr 由接收方回收
@@ -101,6 +94,15 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 		protoSendSerName := ProtocolDistributeInfo.ProtoDistributeArray[elementProtoNum]
 		printer.TextDebug("DoDistribute", "elementProtoNum", elementProtoNum, "protoSendSerName", protoSendSerName)
 
+		//假如是来自客户端的协议，需要判断不可是系统协议（s2s开头的协议内容）
+		protoName := ProtocolDistributeInfo.ProtoNumArray[elementProtoNum]
+		sysMsg := strings.HasPrefix(protoName, "S2S")
+		if (sourceSession > 0) && sysMsg {
+			printer.TextWarn("DoDistribute", "fail reason", "cant distribute sysMsg with client", "protoName", protoName)
+			DistributeDataPool.Put(bufPtr)
+			continue
+		}
+
 		// 缩切到实际数据长度，接收端 *bufPtr 即为有效数据
 		*bufPtr = data
 
@@ -116,7 +118,7 @@ func DoDistribute(cutList *CutIndexList, sliceBuffer []byte, sourceSession uint3
 			SafeSendToLinker(WebSerLinker, bufPtr)
 		case "gateway_server":
 			sendTarSessionID := binary.BigEndian.Uint32(data[:SessionIdLen])
-			SafeSendToGateClient(bufPtr, sendTarSessionID, elementProtoNum)
+			SafeSendToGateClient(bufPtr, sendTarSessionID, protoName, sysMsg)
 		default:
 			DistributeDataPool.Put(bufPtr)
 			printer.TextWarn("DoDistribute", "unknown protoSendSerName", protoSendSerName, "elementProtoNum", elementProtoNum)
