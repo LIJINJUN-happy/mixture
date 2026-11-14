@@ -13,10 +13,8 @@ import (
 	"strings"
 )
 
-const (
-	InternalBroadcastProtocolName = "S2SGateBroadcast" // 服务进程发给网关的内部广播协议，不会直接发送给客户端。
-	ClientBroadcastProtocolName   = "S2CBroadcast"     // 客户端最终收到的广播协议。
-)
+const InternalBroadcastProtocolName = "S2SGateBroadcast" // 服务进程发给网关的内部广播协议，不会直接发送给客户端。
+const ClientBroadcastProtocolName = "S2CBroadcast"       // 客户端最终收到的广播协议。
 
 // 记录一次网关本地广播的投递结果。
 type BroadcastResult struct {
