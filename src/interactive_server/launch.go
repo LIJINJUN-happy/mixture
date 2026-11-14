@@ -23,24 +23,20 @@ func Run() {
 		panic(err)
 	}
 
-	//加载模块功能（模块关闭同步）
-	var modWaitGroup sync.WaitGroup
-
-	//xxx系统
-	xxxMod := server_common.CreateMod("interactiveSerxxx", 2048, func() error { return nil }, func() error { return nil }, &modWaitGroup)
-	if xxxMod == nil {
-		printer.TextError("interactive server module init failed")
-		os.Exit(1)
-	}
-	xxxMod.RegisterProtoHandleCaller("C2STestxxx", func(data []byte, gateId int, sessionID uint32) { return })
-
-	//模块及协议注册完成后，再开放进程监听服务
+	//先绑定端口，再初始化模块并注册协议
 	ready := make(chan error, 1)
 	go interactiveSer.RegisterMonitorLogic(server_common.TranspondProtoPack, ready)
 	if err := <-ready; err != nil {
 		printer.TextError("interactive server startup failed", "err", err)
 		os.Exit(1)
 	}
+
+	//加载模块功能（模块关闭同步）
+	var modWaitGroup sync.WaitGroup
+
+	//xxx系统
+	xxxMod := server_common.CreateMod("interactiveSerxxx", 2048, func() error { return nil }, func() error { return nil }, &modWaitGroup)
+	xxxMod.RegisterProtoHandleCaller("C2STestxxx", func(data []byte, gateId int, sessionID uint32) { return })
 
 	modWaitGroup.Wait()
 }

@@ -161,7 +161,7 @@ func (s *ServerInfo) GetDisposeFunc() func(*[]byte, string, int, uint32) {
 	return s.DisposeFunc
 }
 
-// 注册服务监视逻辑，所有连接到该服务进程的Gate的协议数据包都通过f函数处理；ready报告监听启动结果。
+// 注册服务监视逻辑；ready报告端口绑定结果。
 func (s *ServerInfo) RegisterMonitorLogic(f func(*[]byte, string, int, uint32), ready chan<- error) {
 	serName := s.ServerName
 	serId := s.ServerId

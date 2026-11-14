@@ -80,7 +80,7 @@ func CreateMod(modName string, chanSize int, modInitFunc, serverDownFunc func() 
 	} else {
 		err := errors.New("CreateLogger Logger Failed, ModName: " + modName)
 		printer.PanicStack(err)
-		return nil
+		os.Exit(1)
 	}
 
 	//初始化模块
@@ -89,7 +89,7 @@ func CreateMod(modName string, chanSize int, modInitFunc, serverDownFunc func() 
 		signal.Stop(newMod.closeChan)
 		errMsg := fmt.Errorf("ModInit failed, modName=%s: %w", modName, kickRes)
 		printer.PanicStack(errMsg)
-		return nil
+		os.Exit(1)
 	}
 
 	//把模块名和模块通道做关联,新数据通过通道进入模块内部处理
