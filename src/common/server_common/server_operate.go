@@ -13,6 +13,7 @@ import (
 	"mixture/src/database"
 	"mixture/src/gateway_server"
 	"net"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -162,7 +163,7 @@ func (s *ServerInfo) GetDisposeFunc() func(*[]byte, string, int, uint32) {
 }
 
 // 注册服务监视逻辑；ready报告端口绑定结果。
-func (s *ServerInfo) RegisterMonitorLogic(f func(*[]byte, string, int, uint32), ready chan<- error) {
+func (s *ServerInfo) RegisterMonitorLogic(f func(*[]byte, string, int, uint32)) {
 	serName := s.ServerName
 	serId := s.ServerId
 	port, address := strconv.Itoa(s.GetPort()), s.GetAddress()
@@ -177,41 +178,42 @@ func (s *ServerInfo) RegisterMonitorLogic(f func(*[]byte, string, int, uint32), 
 	ip := strBuilder.String()
 	listener, err := net.Listen("tcp", ip[addrLen:]) //ip = ":yy"(默认监听本地)
 	if err != nil {
-		ready <- fmt.Errorf("listen %s: %w", ip, err)
-		return
+		printer.TextError("server startup failed", "err", err)
+		os.Exit(1)
 	}
 	s.SetDisposeFunc(f)
 	s.SetListener(&listener)
-	ready <- nil
 
-	defer func(l *net.Listener, name string, id int) {
-		if r := recover(); r != nil {
-			printer.PanicStack(r)
-		}
-		errClose := (*l).Close()
-		if errClose != nil {
-			printer.TextError("listener Close Fail", "errClose", errClose.Error(), "ServerName", name, "ServerId", id)
-		}
-		printer.TextInfo("ServerMonitor Down", "ServerName", name, "ServerId", id)
+	go func() {
+		defer func(l *net.Listener, name string, id int) {
+			if r := recover(); r != nil {
+				printer.PanicStack(r)
+			}
+			errClose := (*l).Close()
+			if errClose != nil {
+				printer.TextError("listener Close Fail", "errClose", errClose.Error(), "ServerName", name, "ServerId", id)
+			}
+			printer.TextInfo("ServerMonitor Down", "ServerName", name, "ServerId", id)
 
-	}(&listener, serName, serId)
+		}(&listener, serName, serId)
 
-	//监听网关的连接请求(接受多个网关连接,每连接一个新网关就把新连接对象加入到连接链表中)
-	for {
-		newConn, errorWithAccept := listener.Accept()
-		if errorWithAccept != nil {
-			printer.TextError("Accept Connect Error", "Error", errorWithAccept.Error(), "ServerName", serName, "ServerId", serId)
-			continue
-		}
+		//监听网关的连接请求(接受多个网关连接,每连接一个新网关就把新连接对象加入到连接链表中)
+		for {
+			newConn, errorWithAccept := listener.Accept()
+			if errorWithAccept != nil {
+				printer.TextError("Accept Connect Error", "Error", errorWithAccept.Error(), "ServerName", serName, "ServerId", serId)
+				continue
+			}
 
-		//创建连接对象（网关连接过来成功后创建的对象）,并且加入连接列表里
-		SerConnObjPtr := new(SerConnObj)
-		if initErr := SerConnObjPtr.Init(&newConn); initErr != nil {
-			printer.TextError("Init New Conn Error", "err", initErr.Error(), "ServerName", serName, "ServerId", serId)
-			continue
+			//创建连接对象（网关连接过来成功后创建的对象）,并且加入连接列表里
+			SerConnObjPtr := new(SerConnObj)
+			if initErr := SerConnObjPtr.Init(&newConn); initErr != nil {
+				printer.TextError("Init New Conn Error", "err", initErr.Error(), "ServerName", serName, "ServerId", serId)
+				continue
+			}
+			go s.BeginService(SerConnObjPtr)
 		}
-		go s.BeginService(SerConnObjPtr)
-	}
+	}()
 }
 
 // 启动服务

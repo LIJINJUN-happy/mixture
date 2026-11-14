@@ -19,18 +19,12 @@ func Run() {
 		}
 	}()
 
+	//创建进程监听服务以及进程接收的数据后的处理逻辑
 	id, _ := strconv.Atoi(os.Args[2])
 	if err := actorSer.InitInfo("actorSer", id); err != nil {
 		panic(err)
 	}
-
-	//先绑定端口，再初始化模块并注册协议
-	ready := make(chan error, 1)
-	go actorSer.RegisterMonitorLogic(server_common.TranspondProtoPack, ready)
-	if err := <-ready; err != nil {
-		printer.TextError("actor server startup failed", "err", err)
-		os.Exit(1)
-	}
+	actorSer.RegisterMonitorLogic(server_common.TranspondProtoPack)
 
 	//加载模块功能（模块关闭同步）
 	var modWaitGroup sync.WaitGroup
