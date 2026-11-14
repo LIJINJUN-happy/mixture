@@ -14,6 +14,7 @@ func Run() {
 	defer func() {
 		if r := recover(); r != nil {
 			printer.PanicStack(r)
+			os.Exit(1)
 		}
 	}()
 
@@ -27,10 +28,19 @@ func Run() {
 
 	//xxx系统
 	xxxMod := server_common.CreateMod("webSerxxx", 2048, func() error { return nil }, func() error { return nil }, &modWaitGroup)
+	if xxxMod == nil {
+		printer.TextError("web server module init failed")
+		os.Exit(1)
+	}
 	xxxMod.RegisterProtoHandleCaller("C2STestxxx", func(data []byte, gateId int, sessionID uint32) { return })
 
 	//模块及协议注册完成后，再开放进程监听服务
-	go webSer.RegisterMonitorLogic(server_common.TranspondProtoPack)
+	ready := make(chan error, 1)
+	go webSer.RegisterMonitorLogic(server_common.TranspondProtoPack, ready)
+	if err := <-ready; err != nil {
+		printer.TextError("web server startup failed", "err", err)
+		os.Exit(1)
+	}
 
 	modWaitGroup.Wait()
 }

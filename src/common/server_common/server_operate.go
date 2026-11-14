@@ -161,8 +161,8 @@ func (s *ServerInfo) GetDisposeFunc() func(*[]byte, string, int, uint32) {
 	return s.DisposeFunc
 }
 
-// 注册服务监视逻辑，所有连接到该服务进程的Gate的协议数据包都通过f函数处理
-func (s *ServerInfo) RegisterMonitorLogic(f func(*[]byte, string, int, uint32)) {
+// 注册服务监视逻辑，所有连接到该服务进程的Gate的协议数据包都通过f函数处理；ready报告监听启动结果。
+func (s *ServerInfo) RegisterMonitorLogic(f func(*[]byte, string, int, uint32), ready chan<- error) {
 	serName := s.ServerName
 	serId := s.ServerId
 	port, address := strconv.Itoa(s.GetPort()), s.GetAddress()
@@ -177,11 +177,12 @@ func (s *ServerInfo) RegisterMonitorLogic(f func(*[]byte, string, int, uint32)) 
 	ip := strBuilder.String()
 	listener, err := net.Listen("tcp", ip[addrLen:]) //ip = ":yy"(默认监听本地)
 	if err != nil {
-		printer.TextError("Listen Address Error", "ServerName", serName, "ServerId", serId, "Ip", ip, "ErrMsg", err)
+		ready <- fmt.Errorf("listen %s: %w", ip, err)
 		return
 	}
 	s.SetDisposeFunc(f)
 	s.SetListener(&listener)
+	ready <- nil
 
 	defer func(l *net.Listener, name string, id int) {
 		if r := recover(); r != nil {

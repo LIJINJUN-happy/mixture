@@ -15,6 +15,7 @@ func Run() {
 	defer func() {
 		if r := recover(); r != nil {
 			printer.PanicStack(r)
+			os.Exit(1)
 		}
 	}()
 
@@ -28,10 +29,19 @@ func Run() {
 
 	//用户系统
 	userMod := server_common.CreateMod("user", 2048, user.ModInit, user.ServerDown, &modWaitGroup)
+	if userMod == nil {
+		printer.TextError("actor server module init failed")
+		os.Exit(1)
+	}
 	userMod.RegisterProtoHandleCaller("C2STest", user.Test)
 
 	//模块及协议注册完成后，再开放进程监听服务
-	go actorSer.RegisterMonitorLogic(server_common.TranspondProtoPack)
+	ready := make(chan error, 1)
+	go actorSer.RegisterMonitorLogic(server_common.TranspondProtoPack, ready)
+	if err := <-ready; err != nil {
+		printer.TextError("actor server startup failed", "err", err)
+		os.Exit(1)
+	}
 
 	modWaitGroup.Wait()
 }
