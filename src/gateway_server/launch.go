@@ -45,6 +45,9 @@ func Run() {
 	if err := ClientDenyList.Flush(); err != nil {
 		printer.TextError("Persist denylist on shutdown failed", "err", err)
 	}
+	if err := ClientDenyList.Close(); err != nil {
+		printer.TextError("Close denylist database failed", "err", err)
+	}
 }
 
 func DoInit(db *sql.DB) error {
