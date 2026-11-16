@@ -60,7 +60,7 @@ func DoInit(db *sql.DB) error {
 
 	//白名单初始化逻辑
 	WhiteListPtr.whiteMux.Lock()
-	WhiteListPtr.whiteMap = make(map[string]string)
+	WhiteListPtr.whiteMap = make(map[string]bool)
 	WhiteListPtr.whiteMux.Unlock()
 	if ipListStr := tools.GetSysValueByKey("whiteIPList"); len(ipListStr) > 0 {
 		for _, ip := range strings.Split(ipListStr, "|") {

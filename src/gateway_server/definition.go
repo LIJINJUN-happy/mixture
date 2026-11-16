@@ -116,9 +116,9 @@ var WebSerLinker = new(SerLinker)
 
 // 白名单结构
 type WhiteList struct {
-	whiteMux sync.RWMutex      //使用读写锁,因为绝大部分都是读比较多
-	whiteMap map[string]string //白名单字典
-	IsActive bool              //是否开启
+	whiteMux sync.RWMutex    //使用读写锁,因为绝大部分都是读比较多
+	whiteMap map[string]bool //白名单字典
+	IsActive bool            //是否开启
 }
 
 // NewConnection for Client Connect Object conn对象结构
@@ -390,7 +390,7 @@ func (w *WhiteList) CheckWhiteIP(addr string) bool {
 func (w *WhiteList) AddWhiteIP(addr string) {
 	w.whiteMux.Lock()
 	defer w.whiteMux.Unlock()
-	w.whiteMap[addr] = addr
+	w.whiteMap[addr] = true
 }
 
 func (w *WhiteList) DelWhiteIP(addr string) {
