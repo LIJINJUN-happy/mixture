@@ -255,17 +255,25 @@ func (netObj *NewConnection) AddIntoGateMap() bool {
 	if netObj.closed || netObj.connSession != 0 {
 		return false
 	}
-	clientAddress := (*netObj).RemoteAddr().String()
+	remoteAddr := (*netObj).RemoteAddr()
+	clientAddress := remoteAddr.String()
 	//printer.TextDebug("clientAddress = " + clientAddress)
 
-	//初始化GateMap中的客户端数据。
-	ip, port, _ := strings.Cut(clientAddress, ":")
-	realPort, _ := strconv.Atoi(port)
+	//初始化GateMap中的客户端数据；TCPAddr直接读取IP和端口，兼容IPv4、IPv6及IPv6 Zone。
 	sessionPtr := new(clientSession)
-	sessionPtr.ip = net.ParseIP(ip)
-	sessionPtr.port = uint16(realPort)
 	sessionPtr.wholeAddress = clientAddress
 	sessionPtr.connection = netObj
+	if tcpAddr, ok := remoteAddr.(*net.TCPAddr); ok {
+		sessionPtr.ip = tcpAddr.IP
+		if tcpAddr.Port >= 0 && tcpAddr.Port <= 65535 {
+			sessionPtr.port = uint16(tcpAddr.Port)
+		}
+	} else if host, port, err := net.SplitHostPort(clientAddress); err == nil {
+		if realPort, parseErr := strconv.ParseUint(port, 10, 16); parseErr == nil {
+			sessionPtr.ip = net.ParseIP(host)
+			sessionPtr.port = uint16(realPort)
+		}
+	}
 
 	//uint32回绕后跳过0，并通过LoadOrStore原子占位；遇到仍在线的旧SessionID时继续寻找。
 	maxAttempts := int(GateInfo.maxConnSize) + 2 //最多跨过全部在线ID和回绕时的保留值0后，仍能检查一个空闲ID。
