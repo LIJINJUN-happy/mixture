@@ -30,6 +30,7 @@ const (
 	ConnReadTimeout                  = 180 * time.Second       //读取用户超时间隔（为了防止长时间无响应的情况）
 	ConnWriteTimeout                 = 5 * time.Second         //单次网络写入的最长等待时间，防止慢连接长期阻塞写协程
 	LinkerDialTimeout                = 5 * time.Second         //网关单次连接后端服务的最长等待时间，超时后按现有重连间隔继续尝试
+	WSHandshakeTimeout               = 5 * time.Second         //WS升级响应写入的最长等待时间，超时后关闭连接并归还预留名额
 )
 
 const (
@@ -99,8 +100,9 @@ func ReserveClientConnection() bool {
 
 // WebSocket定义的全局结构对象
 var upgrade = websocket.Upgrader{
-	ReadBufferSize:  ReadStreamBufferSize,
-	WriteBufferSize: ReadStreamBufferSize,
+	HandshakeTimeout: WSHandshakeTimeout, //升级时库会清除HTTP服务器的截止时间，需单独限制握手响应写入
+	ReadBufferSize:   ReadStreamBufferSize,
+	WriteBufferSize:  ReadStreamBufferSize,
 
 	//该函数用于拦截或放行跨域请求。函数返回值为bool类型，即true放行，false拦截。如果请求不是跨域请求可以不赋值
 	CheckOrigin: func(r *http.Request) bool {
