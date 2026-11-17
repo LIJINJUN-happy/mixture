@@ -151,7 +151,7 @@ func DoReadMsg(newConn *NewConnection) {
 			//处理接收到的数据
 			// DEBUG关闭时不构造包体字符串，避免每次读取都产生额外分配。
 			if printer.IsTextDebugEnabled() {
-				printer.TextDebug("doReadMsg", "num", num, "message", string(newConn.ReadBuf[:num]))
+				printer.TextDebug("DoReadMsg", "num", num, "message", string(newConn.ReadBuf[:num]))
 			}
 			if !DealBufferData(newConn, num, &cutList, sliceBuffer) {
 				printer.TextWarn("DoReadMsg", "Illegal packet, closing connection", (*newConn).RemoteAddr().String())
