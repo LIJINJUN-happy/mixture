@@ -2,7 +2,9 @@ package server_common_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"google.golang.org/protobuf/proto"
 	"io"
@@ -311,6 +313,7 @@ func TestSynchronousModuleCall(t *testing.T) {
 	}
 	printer.InitPrinterMgr()
 	printer.SetLoggerObj(printer.CreateLogger("test", "log/", false))
+	t.Run("backend writer recycles on failure", TestTransmitFailureRecycling)
 	t.Run("gateway broadcast", testGatewayBroadcast)
 	t.Run("linker writer stop and socket failure", func(t *testing.T) {
 		for _, failHandshake := range []bool{false, true} {
@@ -453,6 +456,89 @@ func TestSynchronousModuleCall(t *testing.T) {
 			}
 		})
 	})
+}
+
+// TransmitFailureConn 注入发送失败，验证异常退出时的连接及缓冲区清理。
+type TransmitFailureConn struct {
+	net.Conn
+	Mode string //模拟设置截止时间失败、写入失败、短写或panic
+}
+
+// SetWriteDeadline 模拟写入前的失败，其余场景沿用底层连接的截止时间设置。
+func (c *TransmitFailureConn) SetWriteDeadline(deadline time.Time) error {
+	switch c.Mode {
+	case "deadline error":
+		return errors.New("injected deadline error")
+	case "deadline panic":
+		panic("injected deadline panic")
+	}
+	return c.Conn.SetWriteDeadline(deadline)
+}
+
+// Write 模拟写错误、无错误但未写完的短写，以及写入过程中的panic。
+func (c *TransmitFailureConn) Write(data []byte) (int, error) {
+	switch c.Mode {
+	case "write error":
+		return 0, errors.New("injected write error")
+	case "short write":
+		return len(data) - 1, nil
+	default:
+		panic("injected write panic")
+	}
+}
+
+// TestTransmitFailureRecycling 由初始化日志后的隔离子进程调用，避免影响全局日志状态。
+func TestTransmitFailureRecycling(t *testing.T) {
+	if os.Getenv("MIXTURE_MODULE_TEST_DIR") == "" {
+		t.Skip("covered by the isolated module test process")
+	}
+	for _, mode := range []string{"deadline error", "deadline panic", "write error", "short write", "write panic"} {
+		t.Run(mode, func(t *testing.T) {
+			local, remote := net.Pipe()
+			defer remote.Close()
+			defer local.Close()
+			var socket net.Conn = &TransmitFailureConn{Conn: local, Mode: mode}
+			conn := new(sc.SerConnObj)
+			if err := conn.Init(&socket); err != nil {
+				t.Fatal(err)
+			}
+			//预放多个包，同时覆盖正在发送的包和退出时仍留在队列中的包。
+			buffers := make([]*[]byte, 8)
+			for i := range buffers {
+				buf := make([]byte, 8, 32)
+				buffers[i] = &buf
+				if !conn.TrySend(&buf) {
+					t.Fatal("enqueue failed")
+				}
+			}
+			done := make(chan struct{})
+			go func() {
+				defer close(done)
+				new(sc.ServerInfo).Transmit(conn, context.Background())
+			}()
+			select {
+			case <-done:
+			case <-time.After(time.Second):
+				t.Fatal("backend writer did not exit")
+			}
+			//等待发送协程结束后检查恢复长度；不依赖sync.Pool.Get返回特定对象。
+			for i, buf := range buffers {
+				if len(*buf) != cap(*buf) {
+					t.Fatalf("buffer %d was not restored for recycling: len=%d cap=%d", i, len(*buf), cap(*buf))
+				}
+			}
+			if len(conn.GetSendChannel()) != 0 {
+				t.Fatal("backend writer left queued buffers")
+			}
+			probe := []byte{1}
+			if conn.TrySend(&probe) {
+				t.Fatal("closed backend connection accepted a packet")
+			}
+			if _, err := local.Write(probe); err == nil {
+				t.Fatal("backend writer did not close its socket")
+			}
+		})
+	}
 }
 
 func withModule(t *testing.T, name string, size int, fn func(...any) interface{}, run func()) {

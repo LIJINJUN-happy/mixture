@@ -313,12 +313,17 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 }
 
 func (s *ServerInfo) Transmit(sCoon *SerConnObj, ctx context.Context) {
+	var current *[]byte //当前由发送协程持有的缓冲区，异常退出时由defer归还
 	defer func(s *SerConnObj) {
 		if r := recover(); r != nil {
 			printer.PanicStack(r)
 		}
-		s.Close("Transmit")
-		DrainConnQueue(s.sendChannel, &DeliveryMsgBufPool)
+		s.Close("Transmit") //先关闭连接并禁止新消息入队
+		if current != nil {
+			*current = (*current)[:cap(*current)]
+			DeliveryMsgBufPool.Put(current) //回收当前已出队、尚未归还的包
+		}
+		DrainConnQueue(s.sendChannel, &DeliveryMsgBufPool) //回收发送队列中尚未取出的剩余包
 		printer.TextInfo("Transmit Goroutine End........")
 	}(sCoon)
 
@@ -334,6 +339,7 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj, ctx context.Context) {
 			if !ok || bufPtr == nil {
 				return // channel 已关闭，正常退出
 			}
+			current = bufPtr //出队后立即记录回收责任，覆盖后续打包、设置超时及写入的异常路径
 			if sCoon.gateSerConn != nil {
 				if num := gateway_server.DoPack(dataSlice, *bufPtr, 1); num > 0 {
 					writeErr := (*sCoon.gateSerConn).SetWriteDeadline(time.Now().Add(gateway_server.ConnWriteTimeout))
@@ -346,8 +352,6 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj, ctx context.Context) {
 					}
 					if writeErr != nil {
 						printer.TextError("DialObject Write Fail", "writeErr", writeErr.Error(), "ServerName", s.ServerName, "ServerId", s.ServerId)
-						*bufPtr = (*bufPtr)[:cap(*bufPtr)]
-						DeliveryMsgBufPool.Put(bufPtr)
 						return
 					}
 					//printer.TextDebug("DialObject Write Success ", "writeNum", writeNum, "dataSlice", string(dataSlice[0:writeNum]))
@@ -356,6 +360,7 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj, ctx context.Context) {
 			// 恢复容量后归还池，原始指针直接 Put，零逃逸，同时覆盖 DoPack<=0 分支
 			*bufPtr = (*bufPtr)[:cap(*bufPtr)]
 			DeliveryMsgBufPool.Put(bufPtr)
+			current = nil //已归还池，清除持有标记，防止后续退出时再次回收同一缓冲区
 		}
 	}
 }
