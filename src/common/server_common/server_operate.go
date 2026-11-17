@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"google.golang.org/protobuf/proto"
+	"io"
 	"mixture/proto/interior_json"
 	"mixture/proto/interior_pb/ipb"
 	"mixture/src/common/printer"
@@ -306,7 +307,14 @@ func (s *ServerInfo) Transmit(sCoon *SerConnObj, ctx context.Context) {
 			}
 			if sCoon.gateSerConn != nil {
 				if num := gateway_server.DoPack(dataSlice, *bufPtr, 1); num > 0 {
-					_, writeErr := (*sCoon.gateSerConn).Write(dataSlice[0:num])
+					writeErr := (*sCoon.gateSerConn).SetWriteDeadline(time.Now().Add(gateway_server.ConnWriteTimeout))
+					if writeErr == nil {
+						writeNum := 0
+						writeNum, writeErr = (*sCoon.gateSerConn).Write(dataSlice[0:num])
+						if writeErr == nil && writeNum != num {
+							writeErr = io.ErrShortWrite
+						}
+					}
 					if writeErr != nil {
 						printer.TextError("DialObject Write Fail", "writeErr", writeErr.Error(), "ServerName", s.ServerName, "ServerId", s.ServerId)
 						*bufPtr = (*bufPtr)[:cap(*bufPtr)]

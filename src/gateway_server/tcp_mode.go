@@ -1,6 +1,7 @@
 package gateway_server
 
 import (
+	"io"
 	"mixture/src/common/printer"
 	"net"
 	"runtime/debug"
@@ -83,7 +84,14 @@ func DoWriteMsg(newConn *NewConnection) {
 			current = bufPtr
 			num := DoPack(sendBuffer, (*bufPtr)[SessionIdLen:], newConn.StreamBuffer.readWay) //发送给客户端前需要把SessionID前缀去掉
 			if num > 0 {
+				if deadlineErr := newConn.SetWriteDeadline(time.Now().Add(ConnWriteTimeout)); deadlineErr != nil {
+					printer.TextError("SetWriteDeadline Error", "err", deadlineErr.Error())
+					return
+				}
 				sendByteNum, writeError := (*newConn).Write(sendBuffer[:num])
+				if writeError == nil && sendByteNum != num {
+					writeError = io.ErrShortWrite
+				}
 				if writeError != nil {
 					printer.TextError("Write Error", "err", writeError.Error())
 					return

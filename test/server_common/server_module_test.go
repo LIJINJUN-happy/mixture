@@ -351,8 +351,8 @@ func TestSynchronousModuleCall(t *testing.T) {
 		conn.Init(1, &local, nil, "tcp")
 		readDone, writeDone := make(chan error, 1), make(chan struct{})
 		go func() { _, _, err := conn.Read(); readDone <- err }()
-		// A write deadline fails only the write side; the reader needs Close to wake.
-		local.SetWriteDeadline(time.Now().Add(-time.Second))
+		// 关闭对端制造写失败；DoWriteMsg 会刷新写截止时间，不能再预设过期 deadline。
+		remote.Close()
 		for i := 0; i < 8; i++ {
 			buf := gw.DistributeDataPool.Get().(*[]byte)
 			*buf = (*buf)[:8]

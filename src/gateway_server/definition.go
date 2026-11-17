@@ -29,6 +29,7 @@ const (
 	MessageType                      = websocket.BinaryMessage //协议包包含二进制包头和可能非UTF-8 的载荷,WebSocket回包使用二进制帧
 	FirstPacketTimeout               = 10 * time.Second        //客户端连接后首个完整协议包的最长等待时间（防止恶意连接长期占用端口）
 	ConnReadTimeout                  = 180 * time.Second       //读取用户超时间隔（为了防止长时间无响应的情况）
+	ConnWriteTimeout                 = 5 * time.Second         //单次网络写入的最长等待时间，防止慢连接长期阻塞写协程
 )
 
 const (
@@ -277,6 +278,14 @@ func (netObj *NewConnection) Write(b []byte) (n int, err error) {
 
 	//websocket.Write
 	return len(b), (netObj.wsConn).WriteMessage(MessageType, b)
+}
+
+// SetWriteDeadline 同时适配 TCP 和 WebSocket 客户端连接。
+func (netObj *NewConnection) SetWriteDeadline(deadline time.Time) error {
+	if netObj.conn != nil {
+		return (*(netObj.conn)).SetWriteDeadline(deadline)
+	}
+	return netObj.wsConn.SetWriteDeadline(deadline)
 }
 
 func (netObj *NewConnection) Read() (int, []byte, error) {

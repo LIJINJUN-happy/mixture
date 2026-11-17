@@ -242,6 +242,10 @@ func DealWithLinkerData(linker *SerLinker, conn net.Conn, stop <-chan struct{}) 
 			}
 			current = bufPtr
 			if num := DoPack(dataSlice, *bufPtr, ReadStreamBufferObjectWay); num > 0 {
+				if err := conn.SetWriteDeadline(time.Now().Add(ConnWriteTimeout)); err != nil {
+					printer.TextError("GateWay SetWriteDeadline Fail", "writeErr", err)
+					return
+				}
 				n, err := conn.Write(dataSlice[:num])
 				if err == nil && n != num {
 					err = io.ErrShortWrite
@@ -347,7 +351,13 @@ func SendGateIDToRemoteSer(cn *net.Conn, linkerName string) {
 	binary.BigEndian.PutUint16(body[SessionIdLen:dataIdxFrom], uint16(protoNum))
 	cpSize := copy(body[dataIdxFrom:], dateByte)
 	num := DoPack(dataSlice, body, ReadStreamBufferObjectWay)
+	if err := (*cn).SetWriteDeadline(time.Now().Add(ConnWriteTimeout)); err != nil {
+		panic(err)
+	}
 	n, err := (*cn).Write(dataSlice[:num])
+	if err == nil && n != num {
+		err = io.ErrShortWrite
+	}
 	if err != nil {
 		panic(err)
 	}
