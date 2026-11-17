@@ -88,23 +88,25 @@ func MemCacheCmd(cmd, key string, val []byte) (string, error) {
 	}
 }
 
+// StartMemCacheHealthCheck 定期检查缓存连通性，故障时清理空闲连接并由原客户端按需重连。
 func StartMemCacheHealthCheck(interval time.Duration) {
 	go func() {
 		ticker := time.NewTicker(interval)
 		defer ticker.Stop()
+		wasUnhealthy := false
 		for range ticker.C {
 			// 避免重复Load
 			if client := cache.Load(); client != nil {
 				if err := client.Ping(); err != nil {
-					printer.TextWarn("MemCacheHealthCheck", "Ping fail, reconnecting", err.Error())
-					newClient := memcache.New(cacheDBAddr + ":" + cacheDBPort)
-					newClient.Timeout = cacheTimeOut
-					if pingErr := newClient.Ping(); pingErr == nil {
-						cache.Store(newClient)
-						printer.TextInfo("MemCacheHealthCheck", "Reconnect success")
-					} else {
-						printer.TextError("MemCacheHealthCheck", "Reconnect failed", pingErr.Error())
+					wasUnhealthy = true
+					printer.TextWarn("MemCacheHealthCheck", "Ping failed; client will reconnect on demand", err.Error())
+					// Close只关闭空闲连接；正在执行的请求仍使用原客户端，归还的连接也能继续复用。
+					if closeErr := client.Close(); closeErr != nil {
+						printer.TextWarn("MemCacheHealthCheck", "Close idle connections failed", closeErr.Error())
 					}
+				} else if wasUnhealthy {
+					wasUnhealthy = false
+					printer.TextInfo("MemCacheHealthCheck", "Connection recovered")
 				}
 			}
 		}
