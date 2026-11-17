@@ -6,12 +6,11 @@ import (
 	"net"
 	"runtime/debug"
 	"strconv"
-	"strings"
 	"time"
 )
 
 func BeginTcpSer() {
-	address := strings.Join([]string{GateInfo.ip + ":", ""}, GateInfo.port)
+	address := net.JoinHostPort(GateInfo.ip, GateInfo.port)
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
 		panic("Listen Address Error: " + address)
@@ -24,7 +23,7 @@ func BeginTcpSer() {
 		}
 	}(&listener)
 
-	printer.TextInfo(strings.Join([]string{"Listening: ", " ....."}, address))
+	printer.TextInfo("Listening: " + address + " .....")
 	for {
 		conn, acceptErr := listener.Accept() //使用Accept方法，等待用户连接，如果没有请求就一直卡在这里
 		if acceptErr != nil {

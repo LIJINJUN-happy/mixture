@@ -2,6 +2,7 @@ package gateway_server
 
 import (
 	"mixture/src/common/printer"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -15,7 +16,7 @@ func DoRegister() {
 
 func BeginWebSocketSer() {
 	DoRegister()
-	address := strings.Join([]string{GateInfo.ip + ":", ""}, GateInfo.port)
+	address := net.JoinHostPort(GateInfo.ip, GateInfo.port)
 	var strBuild strings.Builder
 	addrLen := len(address)
 	strBuild.Grow(addrLen + 33)
@@ -24,7 +25,7 @@ func BeginWebSocketSer() {
 	strBuild.WriteString(" ...")
 	printer.TextInfo(strBuild.String())
 	server := &http.Server{
-		Addr:              address[:addrLen],
+		Addr:              address,
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	err := server.ListenAndServe() // 限制 Upgrade 前 HTTP 请求头读取时间，防止慢速请求长期占用连接。

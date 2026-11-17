@@ -9,7 +9,6 @@ import (
 	"net"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -410,13 +409,7 @@ func (linker *SerLinker) InitLinker(linkerName string, db *sql.DB, linkerID int)
 	linker.receiveChannel = make(chan *[]byte, channelBufferSize)
 	linker.linkerName = linkerName
 
-	var strBuilder strings.Builder
-	portString := strconv.Itoa(port)
-	strBuilder.Grow(len(address) + 1 + len(portString))
-	strBuilder.WriteString(address)
-	strBuilder.WriteString(":")
-	strBuilder.WriteString(portString)
-	linker.address = strBuilder.String()
+	linker.address = net.JoinHostPort(address, strconv.Itoa(port))
 	return
 }
 
