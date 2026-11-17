@@ -1,0 +1,262 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3200" height="2320" viewBox="0 0 3200 2320" role="img" aria-labelledby="title description">
+  <title id="title">Mixture 服务器架构与双向协议链路</title>
+  <desc id="description">基于当前代码的进程拓扑、Gateway 与四类后端连接、模块消息处理、缓冲区归属、超时防护和数据库恢复机制。青色为请求方向，橙色为返回方向。</desc>
+  <defs>
+    <linearGradient id="background" x2="1" y2="1">
+      <stop stop-color="#101c31"/><stop offset="1" stop-color="#080f1d"/>
+    </linearGradient>
+    <linearGradient id="gateway" x2="1" y2="1">
+      <stop stop-color="#233049"/><stop offset="1" stop-color="#182238"/>
+    </linearGradient>
+    <marker id="request" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#55dec7"/></marker>
+    <marker id="response" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#ffb86b"/></marker>
+    <marker id="link" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10Z" fill="#7f97b8"/></marker>
+    <style>
+      text{font-family:'Microsoft YaHei','Segoe UI',sans-serif;fill:#e5edf9}
+      .title{font-size:58px;font-weight:700;letter-spacing:1px}
+      .subtitle{font-size:28px;fill:#a6b6ce}
+      .section{font-size:34px;font-weight:700}
+      .heading{font-size:31px;font-weight:700}
+      .label{font-size:28px}
+      .body{font-size:26px;fill:#c0cee0}
+      .small{font-size:24px;fill:#9fb1ca}
+      .code{font-family:Consolas,'Microsoft YaHei',monospace;font-size:27px}
+      .mono-small{font-family:Consolas,'Microsoft YaHei',monospace;font-size:24px;fill:#c0cee0}
+      .muted{fill:#9fb1ca}
+      .mint{fill:#55dec7}.amber{fill:#ffb86b}.blue{fill:#80baff}.violet{fill:#c4a0ff}
+      .panel{fill:#111e32;stroke:#283b56;stroke-width:2}
+      .card{fill:#18273e;stroke:#405774;stroke-width:2}
+      .up-card{fill:#12312f;stroke:#3c9d91;stroke-width:2}
+      .down-card{fill:#33291e;stroke:#ae7a44;stroke-width:2}
+      .request{fill:none;stroke:#55dec7;stroke-width:4;marker-end:url(#request)}
+      .response{fill:none;stroke:#ffb86b;stroke-width:4;marker-end:url(#response)}
+      .tcp{fill:none;stroke:#7f97b8;stroke-width:3;marker-start:url(#link);marker-end:url(#link)}
+      .data-link{fill:none;stroke:#7f97b8;stroke-width:3;stroke-dasharray:9 8}
+      .rule{stroke:#34465f;stroke-width:2}
+    </style>
+  </defs>
+
+  <rect width="3200" height="2320" fill="url(#background)"/>
+  <rect x="60" y="58" width="8" height="92" rx="4" fill="#55dec7"/>
+  <text class="title" x="94" y="105">Mixture 服务器架构与协议流</text>
+  <text class="subtitle" x="96" y="154">进程化服务 · 模块串行处理 · 网络读写分离 · 有界队列与指针对象池</text>
+  <g transform="translate(2130 87)">
+    <path class="request" d="M0 0H92"/><text class="body" x="112" y="9">上行请求</text>
+    <path class="response" d="M360 0H268"/><text class="body" x="380" y="9">下行返回</text>
+    <path class="tcp" d="M650 0H742"/><text class="body" x="770" y="9">TCP 双向连接</text>
+  </g>
+  <text class="small" x="3095" y="153" text-anchor="end">当前代码快照 · 2026-11-17</text>
+
+  <!-- 第一层：真实进程与连接关系。 -->
+  <rect class="panel" x="60" y="200" width="3080" height="610" rx="24"/>
+  <text class="section" x="95" y="255">01 / 进程拓扑</text>
+  <text class="small" x="3100" y="254" text-anchor="end">每个 Gateway 按配置连接四类后端；后端之间可经 Gateway 路由</text>
+
+  <rect class="card" x="100" y="350" width="330" height="270" rx="20"/>
+  <text class="heading" x="265" y="403" text-anchor="middle">客户端 Client</text>
+  <text class="label blue" x="265" y="461" text-anchor="middle">TCP / WebSocket</text>
+  <text class="body" x="265" y="510" text-anchor="middle">JSON / Protobuf</text>
+  <text class="body" x="265" y="559" text-anchor="middle">独立读取与发送</text>
+  <path class="tcp" d="M442 485H555"/>
+
+  <rect x="570" y="320" width="550" height="340" rx="20" fill="url(#gateway)" stroke="#d59954" stroke-width="3"/>
+  <text class="heading amber" x="845" y="375" text-anchor="middle">gateway_server</text>
+  <text class="body" x="845" y="432" text-anchor="middle">接入限制 · 白名单 · denylist</text>
+  <text class="code" x="845" y="482" text-anchor="middle">DoSplit → DoDistribute</text>
+  <text class="body" x="845" y="532" text-anchor="middle">SessionID 分配 / 客户端映射</text>
+  <text class="body" x="845" y="582" text-anchor="middle">协议号 → 目标服务数组</text>
+  <text class="small" x="845" y="628" text-anchor="middle">网络队列满：丢弃 / 回收 / 计数</text>
+
+  <path class="tcp" d="M1134 490H1180V340H1234"/>
+  <path class="tcp" d="M1180 440H1234"/>
+  <path class="tcp" d="M1180 540H1234"/>
+  <path class="tcp" d="M1180 490V640H1234"/>
+  <g>
+    <rect class="card" x="1250" y="300" width="420" height="80" rx="15"/>
+    <text class="code mint" x="1460" y="333" text-anchor="middle">ActorSerLinker</text>
+    <text class="small" x="1460" y="363" text-anchor="middle">receiveChannel：2048</text>
+    <rect class="card" x="1250" y="400" width="420" height="80" rx="15"/>
+    <text class="code blue" x="1460" y="433" text-anchor="middle">InteractiveSerLinker</text>
+    <text class="small" x="1460" y="463" text-anchor="middle">receiveChannel：2048</text>
+    <rect class="card" x="1250" y="500" width="420" height="80" rx="15"/>
+    <text class="code violet" x="1460" y="533" text-anchor="middle">ModularizedSerLinker</text>
+    <text class="small" x="1460" y="563" text-anchor="middle">receiveChannel：2048</text>
+    <rect class="card" x="1250" y="600" width="420" height="80" rx="15"/>
+    <text class="code amber" x="1460" y="633" text-anchor="middle">WebSerLinker</text>
+    <text class="small" x="1460" y="663" text-anchor="middle">receiveChannel：2048</text>
+  </g>
+  <path class="tcp" d="M1686 340H1814"/>
+  <path class="tcp" d="M1686 440H1814"/>
+  <path class="tcp" d="M1686 540H1814"/>
+  <path class="tcp" d="M1686 640H1814"/>
+  <g>
+    <rect class="card" x="1830" y="300" width="470" height="80" rx="15"/>
+    <text class="heading mint" x="2065" y="351" text-anchor="middle">actor_server</text>
+    <rect class="card" x="1830" y="400" width="470" height="80" rx="15"/>
+    <text class="heading blue" x="2065" y="451" text-anchor="middle">interactive_server</text>
+    <rect class="card" x="1830" y="500" width="470" height="80" rx="15"/>
+    <text class="heading violet" x="2065" y="551" text-anchor="middle">modularized_server</text>
+    <rect class="card" x="1830" y="600" width="470" height="80" rx="15"/>
+    <text class="heading amber" x="2065" y="651" text-anchor="middle">web_server</text>
+  </g>
+
+  <path class="data-link" d="M2310 340H2360V640H2310M2310 440H2360M2310 540H2360M2360 383H2460M2360 568H2460"/>
+  <rect class="card" x="2480" y="310" width="610" height="145" rx="18"/>
+  <text class="heading mint" x="2510" y="357">MongoDB / 读写客户端</text>
+  <text class="body" x="2510" y="401">各后端按配置初始化独立连接池</text>
+  <text class="small" x="2510" y="436">健康检查 · 验证后原子替换</text>
+  <rect class="card" x="2480" y="495" width="610" height="145" rx="18"/>
+  <text class="heading blue" x="2510" y="542">Memcached / 缓存</text>
+  <text class="body" x="2510" y="586">同进程同 key 加载合并</text>
+  <text class="small" x="2510" y="621">singleflight · 同步回写 · 按需重连</text>
+
+  <text class="body" x="100" y="743">Gateway：客户端读写两协程 + 每条 Linker 读写两协程；后端：每连接 Read / Transmit / Dispose 三协程。</text>
+  <text class="small" x="100" y="783">四类后端均复用 ServerInfo 公共层；web_server 当前是 TCP 后端占位，并非独立 HTTP/WS 业务服务器。Gateway 不初始化 Mongo/Memcache 客户端。</text>
+
+  <!-- 第二层：只展开一条后端连接；其他三类连接复用相同公共层。 -->
+  <rect class="panel" x="60" y="850" width="3080" height="710" rx="24"/>
+  <text class="section" x="95" y="908">02 / 双向消息链路</text>
+  <text class="small" x="3100" y="907" text-anchor="end">展开任一后端连接；SID = SessionID，PN = ProtoNum，方括号数值为队列容量</text>
+  <text class="label mint" x="100" y="965">上行：客户端请求 → Gateway → 后端 → 模块</text>
+
+  <rect class="up-card" x="100" y="1000" width="600" height="200" rx="18"/>
+  <text class="heading mint" x="130" y="1045">Gateway / 读取并路由</text>
+  <text class="code" x="130" y="1091">DoReadMsg / DoUpgradeWS</text>
+  <text class="code" x="130" y="1136">DoSplit → DoDistribute</text>
+  <text class="body" x="130" y="1178">补 SID → SafeSendToLinker</text>
+
+  <rect class="up-card" x="840" y="1000" width="450" height="200" rx="18"/>
+  <text class="heading mint" x="870" y="1045">SerLinker / 写协程</text>
+  <text class="code" x="870" y="1091">receiveChannel [2048]</text>
+  <text class="code" x="870" y="1136">DealWithLinkerData</text>
+  <text class="body" x="870" y="1178">DoPack → TCP Write</text>
+
+  <rect class="up-card" x="1440" y="1000" width="640" height="200" rx="18"/>
+  <text class="heading mint" x="1470" y="1045">后端 / 接收与投递</text>
+  <text class="code" x="1470" y="1091">BeginService → DoSplit</text>
+  <text class="code" x="1470" y="1136">SerConnObj.receiveChannel [1024]</text>
+  <text class="body" x="1470" y="1178">Dispose → TranspondProtoPack</text>
+
+  <rect class="up-card" x="2270" y="1000" width="800" height="200" rx="18"/>
+  <text class="heading mint" x="2300" y="1045">ServerModule / 串行处理</text>
+  <text class="code" x="2300" y="1091">receiptChan → LoadMod</text>
+  <text class="code" x="2300" y="1136">HandleProtoPack / HandleModulePack</text>
+  <text class="body" x="2300" y="1178">每模块一协程；容量由 CreateMod 参数指定</text>
+
+  <path class="request" d="M714 1100H824"/>
+  <path class="request" d="M1304 1100H1424"/>
+  <path class="request" d="M2094 1100H2254"/>
+  <text class="small mint" x="1365" y="1075" text-anchor="middle">TCP</text>
+  <text class="small mint" x="2174" y="1075" text-anchor="middle">按协议名</text>
+
+  <text class="mono-small" x="100" y="1250">客户端（模式1）：[Head 2B][PN 2B][Data]，完整包 ≤ 4096B</text>
+  <text class="mono-small" x="100" y="1292">内部 TCP（模式1）：[Head 2B][SID 4B][PN 2B][Data]，包体 ≤ 4098B，Data ≤ 4092B</text>
+  <path class="response" d="M2670 1214V1304"/>
+  <text class="body amber" x="2710" y="1268">业务处理 / 数据访问</text>
+
+  <rect class="down-card" x="100" y="1320" width="600" height="200" rx="18"/>
+  <text class="heading amber" x="130" y="1365">Gateway / 返回客户端</text>
+  <text class="code" x="130" y="1411">SafeSendToGateClient → TrySend</text>
+  <text class="code" x="130" y="1456">writeChan [64] → DoWriteMsg</text>
+  <text class="body" x="130" y="1498">去 SID → DoPack → TCP/WS Write</text>
+
+  <rect class="down-card" x="840" y="1320" width="450" height="200" rx="18"/>
+  <text class="heading amber" x="870" y="1365">SerLinker / 读协程</text>
+  <text class="code" x="870" y="1411">BeginLinkServer 读循环</text>
+  <text class="code" x="870" y="1456">TCP Read → DoSplit</text>
+  <text class="body" x="870" y="1498">DoDistribute(src=0)</text>
+
+  <rect class="down-card" x="1440" y="1320" width="640" height="200" rx="18"/>
+  <text class="heading amber" x="1470" y="1365">后端 / 发送队列与写协程</text>
+  <text class="code" x="1470" y="1411">DeliveryMsg → SerConnObj.TrySend</text>
+  <text class="code" x="1470" y="1456">SerConnObj.sendChannel [1024]</text>
+  <text class="body" x="1470" y="1498">Transmit → DoPack → TCP Write</text>
+
+  <rect class="down-card" x="2270" y="1320" width="800" height="200" rx="18"/>
+  <text class="heading amber" x="2300" y="1365">业务回包 / 目标网关与会话</text>
+  <text class="code" x="2300" y="1411">DeliveryMsg(gateID, SID, protoName, data)</text>
+  <text class="body" x="2300" y="1456">S2SGateBroadcast → 网关本地处理 → S2CBroadcast</text>
+  <text class="body" x="2300" y="1498">客户端 S2S 被拒绝；网关本地控制包 SID 必须为 0</text>
+
+  <path class="response" d="M2256 1420H2096"/>
+  <path class="response" d="M1426 1420H1306"/>
+  <path class="response" d="M826 1420H716"/>
+  <text class="small amber" x="1365" y="1395" text-anchor="middle">TCP</text>
+
+  <!-- 第三层：各类机制的边界，不将待办能力画成已完成。 -->
+  <g transform="translate(60 1600)">
+    <rect class="panel" width="725" height="610" rx="22"/>
+    <rect x="26" y="31" width="6" height="36" rx="3" fill="#55dec7"/>
+    <text class="heading" x="48" y="60">03 / 生命周期与回收责任</text>
+    <text class="body mint" x="32" y="116">入队成功：缓冲区归消费者</text>
+    <text class="body amber" x="32" y="160">入队失败：由发送方归还池</text>
+    <text class="body" x="32" y="211">Close：sync.Once + 关闭锁，禁止新入队</text>
+    <text class="body" x="32" y="255">正常发送：Put 后清空 current 标记</text>
+    <text class="body" x="32" y="299">异常退出：回收 current + 剩余发送队列</text>
+    <text class="body" x="32" y="343">转交模块后的接收包由模块处理方回收</text>
+    <line class="rule" x1="32" y1="373" x2="693" y2="373"/>
+    <text class="small" x="32" y="414">五个消息池 / 原始指针传递</text>
+    <text class="mono-small" x="32" y="452">DistributeDataPool · DeliveryMsgBufPool</text>
+    <text class="mono-small" x="32" y="490">ReceivePacketBufPool · ProtoPackInfoPool</text>
+    <text class="mono-small" x="32" y="528">ModulePackInfoPool</text>
+    <text class="small" x="32" y="574">Put 后不再访问；sync.Pool 可被 GC 清空。</text>
+  </g>
+
+  <g transform="translate(845 1600)">
+    <rect class="panel" width="725" height="610" rx="22"/>
+    <rect x="26" y="31" width="6" height="36" rx="3" fill="#ffb86b"/>
+    <text class="heading" x="48" y="60">04 / 连接边界与超时</text>
+    <text class="body" x="32" y="116">客户端并发上限：10000（原子预留名额）</text>
+    <text class="body" x="32" y="160">首个完整协议包：10s，残片不续期</text>
+    <text class="body" x="32" y="204">后续客户端读取：180s / 单次写入：5s</text>
+    <text class="body" x="32" y="248">后端拨号：5s；失败后等待 3s 再尝试</text>
+    <text class="body" x="32" y="292">后端等待 GateID 握手：10s</text>
+    <text class="body" x="32" y="336">HTTP 请求头：5s / WS 升级响应：5s</text>
+    <line class="rule" x1="32" y1="373" x2="693" y2="373"/>
+    <text class="body" x="32" y="416">单条 WS 消息上限：4096B（含分片总量）</text>
+    <text class="body" x="32" y="460">SessionID 非零，回绕时避开在线 ID</text>
+    <text class="body" x="32" y="504">Linker 重连前等待旧写协程退出</text>
+    <text class="small" x="32" y="554">客户端支持长度前缀 / 分隔符 / 定长模式；</text>
+    <text class="small" x="32" y="588">内部连接固定使用 2B 长度前缀模式。</text>
+  </g>
+
+  <g transform="translate(1630 1600)">
+    <rect class="panel" width="725" height="610" rx="22"/>
+    <rect x="26" y="31" width="6" height="36" rx="3" fill="#c4a0ff"/>
+    <text class="heading" x="48" y="60">05 / denylist 与运维</text>
+    <text class="body" x="32" y="116">非法包：10 分钟内累计 3 次，封禁 1 小时</text>
+    <text class="body" x="32" y="160">违规次数：仅保留于当前网关内存</text>
+    <text class="body" x="32" y="204">封禁结果：net_sql.db / denylist 表</text>
+    <text class="body" x="32" y="248">写入 / 同步：1s；过期清理：1 分钟</text>
+    <text class="body" x="32" y="292">仅共享同一 SQLite 的网关同步封禁</text>
+    <text class="small" x="32" y="336">首包超时本身不计违规；违规次数不跨进程合并。</text>
+    <line class="rule" x1="32" y1="373" x2="693" y2="373"/>
+    <text class="body blue" x="32" y="416">pprof=true → 独立调试端口</text>
+    <text class="mono-small" x="32" y="460">/debug/pprof/ · /metrics (JSON)</text>
+    <text class="body" x="32" y="504">goroutine 数量 / 网关与后端丢弃计数</text>
+    <text class="small" x="32" y="554">WS 使用独立 ServeMux：/ws、/test；</text>
+    <text class="small" x="32" y="588">调试路由不挂载到 WS 业务端口。</text>
+  </g>
+
+  <g transform="translate(2415 1600)">
+    <rect class="panel" width="725" height="610" rx="22"/>
+    <rect x="26" y="31" width="6" height="36" rx="3" fill="#80baff"/>
+    <text class="heading" x="48" y="60">06 / 存储与模块调用</text>
+    <text class="body mint" x="32" y="116">Mongo：读写客户端分别配置，30s 检查</text>
+    <text class="body" x="32" y="160">新连接验证成功才 Swap；随后关闭旧池</text>
+    <text class="body" x="32" y="204">重建失败保留旧客户端指针</text>
+    <text class="body blue" x="32" y="258">Memcache：操作超时 500ms，TTL 15 分钟</text>
+    <text class="body" x="32" y="302">同进程同 key 合并加载，回写后释放任务</text>
+    <text class="body" x="32" y="346">返回切片独立；不跨进程合并 / 全局限流</text>
+    <line class="rule" x1="32" y1="373" x2="693" y2="373"/>
+    <text class="body" x="32" y="416">模块同步：入队 + 等待结果共用 10s</text>
+    <text class="body" x="32" y="460">已入队消息不会随调用方超时而取消</text>
+    <text class="body" x="32" y="504">模块异步：非阻塞投递，返回是否已入队</text>
+    <text class="small" x="32" y="554">有界队列控制积压；性能与容量仍需压测。</text>
+    <text class="small" x="32" y="588">框架依赖锁、原子量和通道，并非全局无锁。</text>
+  </g>
+
+  <text class="small" x="62" y="2267">代码映射：src/gateway_server · src/common/server_common · src/database · main.go</text>
+  <text class="small" x="3138" y="2267" text-anchor="end">server.svg 可编辑源图 / server.png 高清导出</text>
+  <text class="small" x="62" y="2303">图示聚焦当前架构与已实现机制；业务模块职责为扩展方向，不表示对应玩法或服务能力已全部实现。</text>
+</svg>
