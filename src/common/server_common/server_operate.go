@@ -26,6 +26,7 @@ const (
 	sendChannelSize               = 1024
 	receiveChannelSize            = 1024
 	TransmitDisposeTickerDuration = time.Millisecond * 500
+	GateHandshakeTimeout          = 10 * time.Second //网关连接后完成身份握手的最长等待时间
 )
 
 // 通用服务指针（创建服务器结构体对象后赋值其地址给该指针）
@@ -209,10 +210,10 @@ func (s *ServerInfo) WaitingGateConnect(listener net.Listener, serName string, s
 			printer.TextError("Accept Connect Error", "Error", errorWithAccept.Error(), "ServerName", serName, "ServerId", serId)
 			continue
 		}
-
 		//创建连接对象（网关连接过来成功后创建的对象）,并且加入连接列表里
 		SerConnObjPtr := new(SerConnObj)
 		if initErr := SerConnObjPtr.Init(&newConn); initErr != nil {
+			newConn.Close()
 			printer.TextError("Init New Conn Error", "err", initErr.Error(), "ServerName", serName, "ServerId", serId)
 			continue
 		}
@@ -229,6 +230,10 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 		si.DeleteConnObj(sObj)
 		printer.TextInfo("BeginService Goroutine End........")
 	}(s, sCoon)
+	if err := (*sCoon.gateSerConn).SetReadDeadline(time.Now().Add(GateHandshakeTimeout)); err != nil {
+		printer.TextError("Set Gate Handshake Deadline Fail", "err", err, "RemoteAddr", sCoon.GetGateIPAddr())
+		return
+	}
 
 	//开启两个协程分别处理该连接对象的发送和接收逻辑
 	// ctx 生命周期与本连接一致，BeginService return 时 defer cancel() 自动通知 Transmit/Dispose 退出
@@ -246,6 +251,10 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 	for {
 		num, readError := (*sCoon.gateSerConn).Read(readBuff)
 		if readError != nil {
+			if netErr, ok := readError.(net.Error); ok && netErr.Timeout() && sCoon.GetGateId() < 0 {
+				printer.TextWarn("Gate Handshake Timeout", "RemoteAddr", sCoon.GetGateIPAddr(), "Timeout", GateHandshakeTimeout)
+				return
+			}
 			if checkRes, descString := gateway_server.CheckIsCloseByRemote(readError); checkRes {
 				printer.TextInfo("GateSerConn Close With Client", "desc", descString, "ServerName", s.ServerName)
 			} else {
@@ -361,7 +370,7 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
 				//已经标识了对应的网关并识别到对应的协议号后，直接调用协议处理函数
 				protoName := gateway_server.ProtocolDistributeInfo.ProtoNumArray[protoNum]
 				fun(receiveData, protoName, sCoon.GetGateId(), sessionId)
-			} else if (protoNum == 0) && (sCoon.GetGateId() < 0) {
+			} else if (protoNum == 0) && (sessionId == 0) && (sCoon.GetGateId() < 0) {
 				gateID := -1
 				linkerName := ""
 				dataIdxFrom := gateway_server.ProtoNumLen + gateway_server.SessionIdLen
@@ -370,7 +379,9 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
 					errUnmarshal := proto.Unmarshal(dataSlice[dataIdxFrom:], gatePbStruct)
 					if errUnmarshal != nil {
 						printer.PanicStack(errUnmarshal)
-						return //连接既不被识别也不被关闭，白占资源直到对端断开
+						*receiveData = (*receiveData)[:cap(*receiveData)]
+						ReceivePacketBufPool.Put(receiveData)
+						return
 					}
 					gateID = int(gatePbStruct.GateId)
 					linkerName = gatePbStruct.SerName
@@ -379,12 +390,26 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
 					errUnmarshal := json.Unmarshal(dataSlice[dataIdxFrom:], jsStruct)
 					if errUnmarshal != nil {
 						printer.PanicStack(errUnmarshal)
+						*receiveData = (*receiveData)[:cap(*receiveData)]
+						ReceivePacketBufPool.Put(receiveData)
 						return
 					}
 					gateID = int(jsStruct.GateId)
 					linkerName = jsStruct.SerName
 				}
 
+				if gateID <= 0 || linkerName == "" {
+					printer.TextWarn("Invalid Gate Handshake", "GateID", gateID, "LinkerName", linkerName, "RemoteAddr", sCoon.GetGateIPAddr())
+					*receiveData = (*receiveData)[:cap(*receiveData)]
+					ReceivePacketBufPool.Put(receiveData)
+					return
+				}
+				if err := (*sCoon.gateSerConn).SetReadDeadline(time.Time{}); err != nil {
+					printer.TextError("Clear Gate Handshake Deadline Fail", "err", err, "RemoteAddr", sCoon.GetGateIPAddr())
+					*receiveData = (*receiveData)[:cap(*receiveData)]
+					ReceivePacketBufPool.Put(receiveData)
+					return
+				}
 				sCoon.SetGateId(gateID)
 				if curGateSize := s.AddConnObj(sCoon); curGateSize >= 0 {
 					printer.TextInfo("Dispose SYN GateId", "From GateLinker", linkerName, "GateID", gateID, "ConnObjMapSize", curGateSize)
@@ -396,6 +421,11 @@ func (s *ServerInfo) Dispose(sCoon *SerConnObj, ctx context.Context) {
 				}
 				*receiveData = (*receiveData)[:cap(*receiveData)]
 				ReceivePacketBufPool.Put(receiveData)
+			} else {
+				printer.TextWarn("Unexpected Gate Packet State", "ProtoNum", protoNum, "SessionID", sessionId, "GateID", sCoon.GetGateId(), "RemoteAddr", sCoon.GetGateIPAddr())
+				*receiveData = (*receiveData)[:cap(*receiveData)]
+				ReceivePacketBufPool.Put(receiveData)
+				return
 			}
 		}
 	}
