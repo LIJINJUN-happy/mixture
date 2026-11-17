@@ -52,7 +52,10 @@ func BeginTcpSer() {
 			newConn.slotReserved = true
 
 			//每个Actor连接读写分离
-			newConn.AddIntoGateMap()
+			if !newConn.AddIntoGateMap() {
+				newConn.Close()
+				continue
+			}
 			go DoWriteMsg(newConn)
 			go DoReadMsg(newConn)
 		}

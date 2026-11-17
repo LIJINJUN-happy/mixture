@@ -67,7 +67,6 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 	newConn.slotReserved = true
 	needReleaseReservation = false //后续通过close归还连接名额
 	clientReadGoroutineNum.Add(1)
-	newConn.AddIntoGateMap()
 
 	defer func(wsc *NewConnection) {
 		closeError := wsc.Close()
@@ -76,6 +75,9 @@ func DoUpgradeWS(w http.ResponseWriter, r *http.Request) {
 		}
 		clientReadGoroutineNum.Add(-1)
 	}(newConn)
+	if !newConn.AddIntoGateMap() {
+		return
+	}
 
 	//Do Write
 	go DoWriteMsg(newConn)

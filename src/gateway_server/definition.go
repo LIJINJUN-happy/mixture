@@ -248,23 +248,17 @@ func (netObj *NewConnection) Init(way uint8, socketConn *net.Conn, wSocketConn *
 	}
 }
 
-// 往map中添加newConnection对应的writeChan
-func (netObj *NewConnection) AddIntoGateMap() {
+// 往map中添加newConnection对应的writeChan；成功分配非零且唯一的SessionID时返回true。
+func (netObj *NewConnection) AddIntoGateMap() bool {
 	netObj.closeMux.Lock()
 	defer netObj.closeMux.Unlock()
 	if netObj.closed || netObj.connSession != 0 {
-		return
+		return false
 	}
 	clientAddress := (*netObj).RemoteAddr().String()
 	//printer.TextDebug("clientAddress = " + clientAddress)
-	//不用担心超过uint32后溢出的情况，Add方法在溢出时会自动回绕（wrap around），这是无符号整数在底层硬件上的标准行为
-	sessionId := GateInfo.sessionIdDistributionRecord.Add(1)
-	if _, ok := GateClientMap.Load(sessionId); ok {
-		printer.TextError("AddIntoGateMap Error SessionId Already Exists", "sessionId", sessionId)
-		return
-	}
 
-	//修改gateMap的对应客户端数据
+	//初始化GateMap中的客户端数据。
 	ip, port, _ := strings.Cut(clientAddress, ":")
 	realPort, _ := strconv.Atoi(port)
 	sessionPtr := new(clientSession)
@@ -272,13 +266,30 @@ func (netObj *NewConnection) AddIntoGateMap() {
 	sessionPtr.port = uint16(realPort)
 	sessionPtr.wholeAddress = clientAddress
 	sessionPtr.connection = netObj
-	GateClientMap.Store(sessionId, sessionPtr)
 
-	//标记该连接的SessionID
-	netObj.connSession = sessionId
-	sessionPtr.session = sessionId
-	GateClientMapSize.Add(1)
-	printer.TextDebug("After add client to GateMap", "The Size", GateClientMapSize.Load())
+	//uint32回绕后跳过0，并通过LoadOrStore原子占位；遇到仍在线的旧SessionID时继续寻找。
+	maxAttempts := int(GateInfo.maxConnSize) + 2 //最多跨过全部在线ID和回绕时的保留值0后，仍能检查一个空闲ID。
+	if maxAttempts <= 2 {
+		maxAttempts = MaxConnectClientNum + 2
+	}
+	for attempt := 0; attempt < maxAttempts; attempt++ {
+		sessionID := GateInfo.sessionIdDistributionRecord.Add(1)
+		if sessionID == 0 {
+			continue
+		}
+		sessionPtr.session = sessionID
+		if _, loaded := GateClientMap.LoadOrStore(sessionID, sessionPtr); loaded {
+			continue
+		}
+
+		netObj.connSession = sessionID
+		GateClientMapSize.Add(1)
+		printer.TextDebug("After add client to GateMap", "The Size", GateClientMapSize.Load())
+		return true
+	}
+
+	printer.TextError("AddIntoGateMap Error", "Reason", "No available SessionID", "Attempts", maxAttempts)
+	return false
 }
 
 // 移除map中的 writeChan,防止有数据继续写入而触发panic
