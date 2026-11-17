@@ -5,7 +5,6 @@ import (
 	"mixture/src/common/printer"
 	"net"
 	"runtime/debug"
-	"strconv"
 	"time"
 )
 
@@ -97,8 +96,8 @@ func DoWriteMsg(newConn *NewConnection) {
 				if writeError != nil {
 					printer.TextError("Write Error", "err", writeError.Error())
 					return
-				} else {
-					printer.TextDebug("Write Success", "Send Byte Size", strconv.Itoa(sendByteNum))
+				} else if printer.IsTextDebugEnabled() {
+					printer.TextDebug("Write Success", "Send Byte Size", sendByteNum)
 				}
 			}
 			// 恢复容量后归还池，原始指针直接 Put，零逃逸
@@ -150,7 +149,10 @@ func DoReadMsg(newConn *NewConnection) {
 			return
 		} else {
 			//处理接收到的数据
-			printer.TextDebug("doReadMsg", "num", num, "message", string(newConn.ReadBuf[:num]))
+			// DEBUG关闭时不构造包体字符串，避免每次读取都产生额外分配。
+			if printer.IsTextDebugEnabled() {
+				printer.TextDebug("doReadMsg", "num", num, "message", string(newConn.ReadBuf[:num]))
+			}
 			if !DealBufferData(newConn, num, &cutList, sliceBuffer) {
 				printer.TextWarn("DoReadMsg", "Illegal packet, closing connection", (*newConn).RemoteAddr().String())
 				if ClientDenyList.RecordInvalidPacket((*newConn).RemoteAddr().String()) {

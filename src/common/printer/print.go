@@ -1,6 +1,7 @@
 package printer
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 	"mixture/src/common/tools"
@@ -92,6 +93,13 @@ func (l *LoggerObj) InitLogger(logName, loggerPath string, sys bool) {
 
 func SetLoggerObj(log *LoggerObj) {
 	systemLogObj = log
+}
+
+// 判断文本DEBUG日志是否开启，供调用方跳过昂贵的日志实参构造。
+func IsTextDebugEnabled() bool {
+	return systemLogObj != nil &&
+		systemLogObj.textLogger != nil &&
+		systemLogObj.textLogger.Enabled(context.Background(), slog.LevelDebug)
 }
 
 func TextDebug(msg string, args ...any) {
