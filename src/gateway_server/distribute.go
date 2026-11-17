@@ -26,6 +26,7 @@ func SafeSendToLinker(linker *SerLinker, bufPtr *[]byte) {
 	select {
 	case linker.receiveChannel <- bufPtr:
 	default:
+		GatewayDropCounters.linkerQueueFull.Add(1)
 		printer.TextWarn("DoDistribute", "Linker channel full, drop packet", linker.linkerName)
 		DistributeDataPool.Put(bufPtr)
 	}
@@ -50,6 +51,9 @@ func SafeSendToGateClient(bufPtr *[]byte, sessionID uint32, protoName string, sy
 				printer.TextWarn("DoDistribute", "Client Closed Or Buffer Full, Drop Msg SessionID", sessionID)
 			}
 		}
+	}
+	if !sysMsg {
+		GatewayDropCounters.clientSend.Add(1)
 	}
 	*bufPtr = (*bufPtr)[:cap(*bufPtr)]
 	DistributeDataPool.Put(bufPtr)

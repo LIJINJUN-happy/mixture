@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"mixture/robot"
 	"mixture/src/actor_server"
 	"mixture/src/common/printer"
+	"mixture/src/common/server_common"
 	"mixture/src/common/settings"
 	"mixture/src/common/tools"
 	"mixture/src/database"
@@ -14,6 +16,7 @@ import (
 	"net/http"
 	_ "net/http/pprof"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -123,6 +126,17 @@ func CheckIsOpenDeBugMode(serName, processId string) {
 				printer.TextError("database.GetDeBugModePort", "resPort", resPort)
 				return
 			} else {
+				http.HandleFunc("/metrics", func(w http.ResponseWriter, _ *http.Request) {
+					w.Header().Set("Content-Type", "application/json")
+					if err := json.NewEncoder(w).Encode(map[string]any{
+						"time":          time.Now(),
+						"goroutines":    runtime.NumGoroutine(),
+						"gateway_drops": gateway_server.GetGatewayDropMetrics(),
+						"server_drops":  server_common.GetServerDropMetrics(),
+					}); err != nil {
+						printer.TextError("Encode metrics failed", "err", err)
+					}
+				})
 				errOpenDebug := http.ListenAndServe(":"+resPort, nil) // 启动pprof服务器http://localhost:xxx/debug/pprof/goroutine?debug=2
 				if errOpenDebug != nil {
 					printer.TextError("Error starting debug server", "errOpenDebug", errOpenDebug)

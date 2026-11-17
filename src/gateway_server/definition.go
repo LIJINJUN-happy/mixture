@@ -48,6 +48,29 @@ type CutIndexList struct {
 	len  int
 }
 
+// 网关进程自启动以来的累计消息丢弃统计。
+type GatewayDropMetrics struct {
+	LinkerQueueFull uint64 `json:"linker_queue_full"` //发往后端服务的 Linker 队列已满
+	ClientSend      uint64 `json:"client_send"`       //目标客户端不存在、已关闭或写队列已满
+	BroadcastSend   uint64 `json:"broadcast_send"`    //广播目标不存在、已关闭、写队列已满或广播包过大
+}
+
+// 该结构保存网关各类消息丢弃场景的原子累计值。
+var GatewayDropCounters struct {
+	linkerQueueFull atomic.Uint64
+	clientSend      atomic.Uint64
+	broadcastSend   atomic.Uint64
+}
+
+// GetGatewayDropMetrics 返回当前网关丢弃计数的只读快照。
+func GetGatewayDropMetrics() GatewayDropMetrics {
+	return GatewayDropMetrics{
+		LinkerQueueFull: GatewayDropCounters.linkerQueueFull.Load(),
+		ClientSend:      GatewayDropCounters.clientSend.Load(),
+		BroadcastSend:   GatewayDropCounters.broadcastSend.Load(),
+	}
+}
+
 // 白名单指针对象
 var WhiteListPtr = new(WhiteList)
 

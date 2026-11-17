@@ -253,6 +253,7 @@ func AsynchronousPack2Module(modName string, interfaceFuncName string, args []an
 			case mod.receiptChan <- info:
 				return true
 			default:
+				ServerDropCounters.asyncModuleQueueFull.Add(1)
 				*info = ModulePackInfo{}
 				ModulePackInfoPool.Put(info)
 				printer.TextWarn("AsynchronousPack2Module Queue Full", "ModName", modName, "CallFunc", interfaceFuncName)

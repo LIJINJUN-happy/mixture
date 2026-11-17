@@ -28,6 +28,9 @@ type BroadcastResult struct {
 // sessionIDs为空时遍历全部在线连接，否则解析逗号分隔的sessionID；每个客户端独占一块池化缓冲区。
 func BroadcastToGateClients(sessionIDs string, protoNum uint16, payload []byte) BroadcastResult {
 	result := BroadcastResult{}
+	defer func() {
+		GatewayDropCounters.broadcastSend.Add(uint64(result.Dropped))
+	}()
 	packetLen := SessionIdLen + ProtoNumLen + len(payload)
 	if packetLen > int(MaxPacketBodySize) {
 		result.Dropped = 1
