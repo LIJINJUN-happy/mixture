@@ -9,13 +9,15 @@ import (
 	"time"
 )
 
-func DoRegister() {
-	http.HandleFunc("/ws", DoUpgradeWS) //升级成WS请求处理
-	http.HandleFunc("/test", TestFunc)  //测试例子
+// 本次WS监听创建独立路由表，允许监听重启时重新注册，并与调试服务路由隔离。
+func DoRegister() *http.ServeMux {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/ws", DoUpgradeWS) //升级成WS请求处理
+	mux.HandleFunc("/test", TestFunc)  //测试例子
+	return mux
 }
 
 func BeginWebSocketSer() {
-	DoRegister()
 	address := net.JoinHostPort(GateInfo.ip, GateInfo.port)
 	var strBuild strings.Builder
 	addrLen := len(address)
@@ -26,6 +28,7 @@ func BeginWebSocketSer() {
 	printer.TextInfo(strBuild.String())
 	server := &http.Server{
 		Addr:              address,
+		Handler:           DoRegister(),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 	err := server.ListenAndServe() // 限制 Upgrade 前 HTTP 请求头读取时间，防止慢速请求长期占用连接。
