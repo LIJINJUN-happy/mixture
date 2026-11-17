@@ -29,6 +29,7 @@ const (
 	FirstPacketTimeout               = 10 * time.Second        //客户端连接后首个完整协议包的最长等待时间（防止恶意连接长期占用端口）
 	ConnReadTimeout                  = 180 * time.Second       //读取用户超时间隔（为了防止长时间无响应的情况）
 	ConnWriteTimeout                 = 5 * time.Second         //单次网络写入的最长等待时间，防止慢连接长期阻塞写协程
+	LinkerDialTimeout                = 5 * time.Second         //网关单次连接后端服务的最长等待时间，超时后按现有重连间隔继续尝试
 )
 
 const (

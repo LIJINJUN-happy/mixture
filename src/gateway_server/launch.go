@@ -162,7 +162,7 @@ func BeginLinkServer(sl *SerLinker) {
 
 		for {
 			var err error
-			if dial, err = net.Dial("tcp", serLinker.address); err != nil {
+			if dial, err = net.DialTimeout("tcp", serLinker.address, LinkerDialTimeout); err != nil {
 				printer.TextError("Link Fail", "LinkerName", serLinker.linkerName, "Error", err.Error())
 				time.Sleep(GateInfo.rebuildListenSec * time.Second)
 				continue //链接失败再重新尝试,不成功就不创建dealWithLinkerData协程,避免协程泄露
