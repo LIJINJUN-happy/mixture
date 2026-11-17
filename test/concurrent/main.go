@@ -214,6 +214,7 @@ func worker(ctx context.Context, address, mode string, interval, timeout, readDe
 	conn, err := DialTarget(address, timeout)
 	if err != nil {
 		s.dialFailed.Add(1)
+		fmt.Fprintf(os.Stderr, "DIAL_ERROR target=%s error=%v\n", address, err)
 		return
 	}
 	s.connected.Add(1)
@@ -252,6 +253,7 @@ func worker(ctx context.Context, address, mode string, interval, timeout, readDe
 		if err := writeAll(conn, request); err != nil {
 			if ctx.Err() == nil {
 				s.failed.Add(1)
+				fmt.Fprintf(os.Stderr, "WRITE_ERROR target=%s error=%v\n", address, err)
 			}
 			return
 		}
@@ -274,6 +276,7 @@ func worker(ctx context.Context, address, mode string, interval, timeout, readDe
 		if err := readReply(conn); err != nil {
 			if ctx.Err() == nil {
 				s.failed.Add(1)
+				fmt.Fprintf(os.Stderr, "READ_ERROR target=%s error=%v\n", address, err)
 			}
 			return
 		}
