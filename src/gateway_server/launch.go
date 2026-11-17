@@ -378,15 +378,8 @@ func CheckIsCloseByRemote(readError error) (bool, string) {
 	return false, ""
 }
 
+// 识别包含包装层的网络超时；实现net.Error本身不代表发生了超时。
 func CheckIsReadTimeOut(readError error) bool {
-	theType := new(net.Error)
-	switch {
-	case errors.As(readError, theType):
-		if (*theType).Timeout() {
-			break
-		}
-	default:
-		return false
-	}
-	return true
+	var netErr net.Error
+	return errors.As(readError, &netErr) && netErr.Timeout()
 }
