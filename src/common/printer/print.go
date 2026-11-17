@@ -156,7 +156,11 @@ func TrickLog(modName string, msg string, args ...any) {
 			PanicStack(r)
 		}
 	}()
-	if l := PrintMgrPtr.Get(modName); l != nil {
+	//读锁必须覆盖Get和Info；只锁Get仍可能在实际写入前被轮转关闭文件。
+	p := PrintMgrPtr
+	p.logMux.RLock()
+	defer p.logMux.RUnlock()
+	if l := p.Get(modName); l != nil {
 		l.jsonLogger.Info(msg, args...)
 	}
 }

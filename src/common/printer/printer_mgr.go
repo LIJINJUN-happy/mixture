@@ -11,8 +11,9 @@ var PrintMgrPtr *printerMgr = nil
 
 // 日志管理器结构
 type printerMgr struct {
-	logMapPtr   *sync.Map //日志容器的对象指针
-	curZeroDate time.Time //当前日志天数分页标识
+	logMux      sync.RWMutex //保护模块日志从获取到写入的全过程，与跨天替换、关闭旧文件互斥
+	logMapPtr   *sync.Map    //日志容器的对象指针
+	curZeroDate time.Time    //当前日志天数分页标识
 }
 
 func InitPrinterMgr() {
@@ -45,6 +46,9 @@ func (p *printerMgr) Del(logName string) {
 
 // 检测是否跨天分页日志
 func (p *printerMgr) CheckIsNeedCreateNewDate() {
+	//等待已取得旧日志对象的写入完成，并阻止切换期间取得旧对象。
+	p.logMux.Lock()
+	defer p.logMux.Unlock()
 	if zeroTime := tools.GetZeroTime(); zeroTime != p.curZeroDate {
 		p.curZeroDate = zeroTime
 		p.logMapPtr.Range(func(k, v interface{}) bool {
