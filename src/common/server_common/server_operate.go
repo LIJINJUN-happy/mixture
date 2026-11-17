@@ -17,7 +17,6 @@ import (
 	"net"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -195,17 +194,11 @@ func (s *ServerInfo) GetDisposeFunc() func(*[]byte, string, int, uint32) {
 func (s *ServerInfo) RegisterMonitorLogic(f func(*[]byte, string, int, uint32)) {
 	port, address := strconv.Itoa(s.GetPort()), s.GetAddress()
 
-	//开始监听后设置响应函数,以及监听对象指针
-	var strBuilder strings.Builder
-	addrLen, portLen := len(address), len(port)
-	strBuilder.Grow(addrLen + portLen + 1)
-	strBuilder.WriteString(address)
-	strBuilder.WriteString(":")
-	strBuilder.WriteString(port)
-	ip := strBuilder.String()
-	listener, err := net.Listen("tcp", ip[addrLen:]) //ip = ":yy"(默认监听本地)
+	//按数据库配置的完整IP和端口监听；JoinHostPort同时兼容IPv4与IPv6。
+	listenAddress := net.JoinHostPort(address, port)
+	listener, err := net.Listen("tcp", listenAddress)
 	if err != nil {
-		printer.TextError("server startup failed", "err", err)
+		printer.TextError("server startup failed", "err", err, "listenAddress", listenAddress)
 		os.Exit(1)
 	}
 	s.SetDisposeFunc(f)
