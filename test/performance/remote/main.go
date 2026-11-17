@@ -1,4 +1,4 @@
-// 远程验收编排器：只访问指定业务/诊断端口，不修改或重启远端服务。
+// TCP验收编排器：只访问指定业务/诊断端口，不修改或重启服务。
 package main
 
 import (
@@ -263,7 +263,7 @@ func run(ctx context.Context, load, address, host, dir string, s scenario) resul
 	cmd.Stdout = io.MultiWriter(f, &out)
 	cmd.Stderr = cmd.Stdout
 	var profiles sync.WaitGroup
-	if s.Name == "echo-100" {
+	if s.Name == "echo-100" || s.Name == "local-large-100" {
 		for _, port := range []int{6060, 6061} {
 			profiles.Add(1)
 			go func(port int) {
@@ -300,8 +300,16 @@ func main() {
 	address := flag.String("addr", "113.45.222.72:7891", "business TCP address")
 	load := flag.String("load", "", "prebuilt concurrent load executable")
 	dir := flag.String("out", "", "new artifacts directory")
-	suite := flag.String("suite", "initial", "initial, recheck, edges, edges-low, stall, or soak")
+	suite := flag.String("suite", "initial", "initial, recheck, edges, edges-low, stall, soak, or local")
 	flag.Parse()
+	// 本机对照必须显式选择回环地址，避免误用默认公网目标。
+	if *suite == "local" {
+		businessHost, _, err := net.SplitHostPort(*address)
+		diagnosticIP, businessIP := net.ParseIP(*host), net.ParseIP(businessHost)
+		if err != nil || diagnosticIP == nil || !diagnosticIP.IsLoopback() || businessIP == nil || !businessIP.IsLoopback() {
+			panic("local suite requires explicit loopback -host and -addr")
+		}
+	}
 	if *load == "" || *dir == "" {
 		panic("-load and -out are required")
 	}
@@ -351,6 +359,18 @@ func main() {
 		for _, n := range []int{250, 500, 1000} {
 			scenarios = append(scenarios, scenario{Name: fmt.Sprintf("online-%d", n), Connections: n, Ramp: 100, Duration: "45s", Interval: "1s"})
 		}
+	case "local":
+		// 回环定位只比较收发与负载行为，不替代Linux公网环境的容量验收。
+		scenarios = []scenario{
+			{Name: "local-baseline", Connections: 1, Ramp: 1, Duration: "20s", Interval: "0"},
+			{Name: "local-small-50", Connections: 50, Ramp: 50, Duration: "30s", Interval: "0"},
+			{Name: "local-small-100", Connections: 100, Ramp: 50, Duration: "30s", Interval: "0"},
+			{Name: "local-payload-1024", Connections: 20, Ramp: 20, Duration: "30s", Interval: "0", Payload: 1024},
+		}
+		for repeat := 1; repeat <= 3; repeat++ {
+			scenarios = append(scenarios, scenario{Name: fmt.Sprintf("local-large-20-r%d", repeat), Connections: 20, Ramp: 20, Duration: "30s", Interval: "0", Payload: 4092})
+		}
+		scenarios = append(scenarios, scenario{Name: "local-large-100", Connections: 100, Ramp: 50, Duration: "45s", Interval: "0", Payload: 4092}, scenario{Name: "local-recovery", Connections: 10, Ramp: 10, Duration: "20s", Interval: "0"})
 	case "recheck":
 		scenarios = []scenario{
 			{Name: "recovery-before-recheck", Connections: 10, Ramp: 10, Duration: "20s", Interval: "0"},

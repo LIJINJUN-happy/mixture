@@ -6,6 +6,8 @@
 
 本轮详细记录：[2026-11-17 远程性能与稳定性实测](remote_113.45.222.72_2026-11-17.md)；分阶段采样和复现工具见 [remote/README.md](remote/README.md)。
 
+后续对照：[2026-11-18 已启动正式服务的Windows本地回环测试](local_running_2026-11-18.md)。
+
 所有命令从项目根目录执行。工具支持 TCP地址或 `ws://host:port/ws` / `wss://host:port/ws`，使用模式1、protobuf，发送协议1 `C2STest{Num:1}`，校验协议2 `S2CTestRet{Num:2}`。先启动数据库依赖、业务服务和网关，确认协议映射一致。JSON及另外两种切包模式尚未适配。
 `-payload-bytes 4092` 通过合法protobuf unknown字段填充最大请求数据；它不改变业务回包大小，不代表已覆盖大回包或广播。
 
