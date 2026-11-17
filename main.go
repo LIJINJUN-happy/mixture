@@ -1,10 +1,10 @@
 package main
 
 import (
-	"encoding/json"
 	"mixture/robot"
 	"mixture/src/actor_server"
 	"mixture/src/common/printer"
+	"mixture/src/common/profile_trace"
 	"mixture/src/common/server_common"
 	"mixture/src/common/settings"
 	"mixture/src/common/tools"
@@ -13,10 +13,9 @@ import (
 	"mixture/src/interactive_server"
 	"mixture/src/modularized_server"
 	"mixture/src/web_server"
+	"net"
 	"net/http"
-	_ "net/http/pprof"
 	"os"
-	"runtime"
 	"strconv"
 	"strings"
 	"time"
@@ -126,18 +125,26 @@ func CheckIsOpenDeBugMode(serName, processId string) {
 				printer.TextError("database.GetDeBugModePort", "resPort", resPort)
 				return
 			} else {
-				http.HandleFunc("/metrics", func(w http.ResponseWriter, _ *http.Request) {
-					w.Header().Set("Content-Type", "application/json")
-					if err := json.NewEncoder(w).Encode(map[string]any{
-						"time":          time.Now(),
-						"goroutines":    runtime.NumGoroutine(),
-						"gateway_drops": gateway_server.GetGatewayDropMetrics(),
-						"server_drops":  server_common.GetServerDropMetrics(),
-					}); err != nil {
-						printer.TextError("Encode metrics failed", "err", err)
-					}
-				})
-				errOpenDebug := http.ListenAndServe(":"+resPort, nil) // 启动pprof服务器http://localhost:xxx/debug/pprof/goroutine?debug=2
+				// 调试监听与业务端口分离,公网直连时应由防火墙限制来源IP,接口本身不提供鉴权。
+				listenHost := tools.GetSysValueByKey("debugListenAddress")
+				if listenHost == "" {
+					listenHost = "127.0.0.1" //默认仅允许本机或SSH隧道访问,远程直连须显式配置并限制来源IP
+				}
+
+				// 传入采样函数而非当前值，请求/metrics时才读取最新状态,trace包无需依赖业务包。
+				server := &http.Server{
+					Addr: net.JoinHostPort(listenHost, resPort),
+					Handler: profile_trace.NewDebugMux(serName, processId, profile_trace.TraceSources{
+						ModuleQueues:       server_common.GetModuleQueueMetrics,
+						GatewayClients:     gateway_server.GateClientMapSize.Load,
+						GatewayWriteQueues: gateway_server.GetGatewayWriteQueueMetrics,
+					}),
+					ReadHeaderTimeout: 5 * time.Second, //限制请求头读取时间，不限制pprof性能采样的持续时间
+				}
+
+				// 调试入口早于业务初始化完成启动，能访问/metrics不代表服务已就绪。
+				printer.TextInfo("Debug HTTP Listening", "address", server.Addr, "server", serName, "id", processId)
+				errOpenDebug := server.ListenAndServe()
 				if errOpenDebug != nil {
 					printer.TextError("Error starting debug server", "errOpenDebug", errOpenDebug)
 					return

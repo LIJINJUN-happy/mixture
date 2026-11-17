@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"mixture/src/common/printer"
+	"mixture/src/common/profile_trace"
 	"mixture/src/common/tools"
 	"os"
 	"reflect"
@@ -26,7 +27,7 @@ func SafeSendToLinker(linker *SerLinker, bufPtr *[]byte) {
 	select {
 	case linker.receiveChannel <- bufPtr:
 	default:
-		GatewayDropCounters.linkerQueueFull.Add(1)
+		profile_trace.GatewayDropCounters.LinkerQueueFull.Add(1)
 		printer.TextWarn("DoDistribute", "Linker channel full, drop packet", linker.linkerName)
 		DistributeDataPool.Put(bufPtr)
 	}
@@ -53,7 +54,7 @@ func SafeSendToGateClient(bufPtr *[]byte, sessionID uint32, protoName string, sy
 		}
 	}
 	if !sysMsg {
-		GatewayDropCounters.clientSend.Add(1)
+		profile_trace.GatewayDropCounters.ClientSend.Add(1)
 	}
 	*bufPtr = (*bufPtr)[:cap(*bufPtr)]
 	DistributeDataPool.Put(bufPtr)

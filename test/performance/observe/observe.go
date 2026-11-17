@@ -3,6 +3,7 @@ package observe
 
 import (
 	"encoding/json"
+	"mixture/src/common/profile_trace"
 	sc "mixture/src/common/server_common"
 	gw "mixture/src/gateway_server"
 	"net"
@@ -27,7 +28,7 @@ func Start(address string) (*http.Server, error) {
 			queues[name] = map[string]int{"length": len(q), "capacity": cap(q)}
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{"time": time.Now(), "goroutines": runtime.NumGoroutine(), "gateway_clients": gw.GateClientMapSize.Load(), "heap_alloc": m.HeapAlloc, "heap_inuse": m.HeapInuse, "total_alloc": m.TotalAlloc, "mallocs": m.Mallocs, "num_gc": m.NumGC, "gc_pause_ns": m.PauseTotalNs, "gc_cpu_fraction": m.GCCPUFraction, "protocol_queues": queues, "gateway_drops": gw.GetGatewayDropMetrics(), "server_drops": sc.GetServerDropMetrics()})
+		json.NewEncoder(w).Encode(map[string]any{"time": time.Now(), "goroutines": runtime.NumGoroutine(), "gateway_clients": gw.GateClientMapSize.Load(), "heap_alloc": m.HeapAlloc, "heap_inuse": m.HeapInuse, "total_alloc": m.TotalAlloc, "mallocs": m.Mallocs, "num_gc": m.NumGC, "gc_pause_ns": m.PauseTotalNs, "gc_cpu_fraction": m.GCCPUFraction, "protocol_queues": queues, "gateway_drops": profile_trace.GetGatewayDropMetrics(), "server_drops": profile_trace.GetServerDropMetrics()})
 	})
 	listener, err := net.Listen("tcp", address)
 	if err != nil {

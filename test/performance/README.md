@@ -1,8 +1,11 @@
 # 性能测试模板
 
+本轮远程部署先按 [REMOTE_DEPLOY.md](REMOTE_DEPLOY.md) 准备，包含代码改动、6060～6064调试端口、SQL、直连/SSH隧道及系统采集方式。
+
 实测报告：[113.45.222.72:7891，2026-11-09 公网短时阶梯压测](remote_113.45.222.72_2026-11-09.md)。
 
-所有命令从项目根目录执行。工具使用 TCP、模式1、protobuf，发送协议1 `C2STest{Num:1}`，校验协议2 `S2CTestRet{Num:2}`。先启动数据库依赖、业务服务和网关，确认协议映射一致。其他协议或 WS 需要另写客户端适配，不能直接套用本工具。
+所有命令从项目根目录执行。工具支持 TCP地址或 `ws://host:port/ws` / `wss://host:port/ws`，使用模式1、protobuf，发送协议1 `C2STest{Num:1}`，校验协议2 `S2CTestRet{Num:2}`。先启动数据库依赖、业务服务和网关，确认协议映射一致。JSON及另外两种切包模式尚未适配。
+`-payload-bytes 4092` 通过合法protobuf unknown字段填充最大请求数据；它不改变业务回包大小，不代表已覆盖大回包或广播。
 
 ## 1. 基线与阶梯并发
 
@@ -30,21 +33,14 @@ go build -o test/performance/load.exe ./test/concurrent
 ./test/performance/load.exe -mode noread -connections 20 -interval 1ms -duration 60s
 ```
 
-`connect` 仅建连；测试持续时间超过服务器空闲超时后断连是预期行为。`read-delay` 延迟已包含在RTT内，不是纯服务器耗时。`noread` 持续发送但完全不读取，用于观察写阻塞、队列满、连接退出；该模式不统计业务成功延迟。小回包可能很久才填满系统socket缓存，需结合服务端队列观察，不能仅凭运行60秒认定已覆盖慢连接故障。
+`connect` 仅建连；当前服务器有10秒首包超时，未发送首包的连接约10秒断开是预期行为。`read-delay` 延迟已包含在RTT内，不是纯服务器耗时。`noread` 持续发送但完全不读取，用于观察写阻塞、队列满、连接退出；该模式不统计业务成功延迟。小回包可能很久才填满系统socket缓存，需结合服务端队列观察，不能仅凭运行60秒认定已覆盖慢连接故障。
 
 ## 3. 服务端观测（仅测试部署启用）
 
-网关和 Actor 已分别在 `127.0.0.1:6060` 和 `127.0.0.1:6061` 启动观测接口。诊断包不直接依赖业务包，由各进程传入队列快照回调，避免 Go import cycle。其他进程需要接入时，在完成模块及协议注册后调用：
-
-```go
-import "mixture/test/performance/observe"
-
-diagnostics, err := observe.Start("127.0.0.1:6062")
-if err != nil { panic(err) }
-defer diagnostics.Close() // 放在保持运行的启动函数中，不能放在立即返回的初始化函数中
-```
-
-不同进程使用不同端口，绑定回环地址。不传回调时 `protocol_queues` 为空，但堆、GC、goroutine 和 pprof 仍然可用。
+正式部署使用 `main.go` 已有的诊断启动入口，通过 `pprof=true`、`debugListenAddress` 和数据库各服务的 `deBugModePort` 启用。
+端口6060～6064为本轮推荐分配，需按部署说明配置并启动，不代表服务器上已经开启。
+默认回环监听；直连需显式配置外部监听并限制来源IP。不要在正式启动路径另外调用 `observe.Start` 争用这些端口。
+`test/performance/observe` 仅用于隔离测试夹具；正式接口返回 `module_queues`（按模块名），夹具旧接口的 `protocol_queues` 则按协议名采样。
 
 ```powershell
 Invoke-RestMethod http://127.0.0.1:6060/metrics | ConvertTo-Json -Depth 8
@@ -52,7 +48,9 @@ go tool pprof -http=127.0.0.1:8081 http://127.0.0.1:6060/debug/pprof/heap
 go tool pprof -http=127.0.0.1:8082 'http://127.0.0.1:6060/debug/pprof/profile?seconds=30'
 ```
 
-每1～5秒采集一次metrics。`protocol_queues` 是瞬时长度，不是峰值；多个协议可能指向同一个模块队列，不要累加。框架当前没有独立丢弃计数器，可按压测时间窗口统计日志中的 `Queue Full`、`channel full`、`Drop msg`，但日志统计只是辅助证据，不是精确端到端丢失率。若需要精确丢弃指标，应在各失败分支加入原子计数；本模板未修改业务路径。
+建议每2～5秒采集一次metrics。`module_queues` 和 `gateway_write_queues` 是瞬时状态，不是历史峰值。
+已有 `gateway_drops`、`server_drops` 累计计数，应记录同进程同时间窗口的增量；日志只能作为辅助证据，这些计数也不是精确端到端丢失率。
+正式接口还提供进程ID、启动时间、构建版本、在线客户端数、堆、GC与累计分配；重启后不能直接对计数做跨进程相减。
 
 在稳定流量窗口开始和结束各采一份metrics：
 

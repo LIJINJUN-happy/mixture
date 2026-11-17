@@ -1,6 +1,9 @@
 --是否打开pprof调试模式
 pprof=true
 
+--调试HTTP监听IP；远程直连测试可改为0.0.0.0，同时在防火墙限定测试来源IP
+debugListenAddress=127.0.0.1
+
 --日志等级设置（默认为Info等级,内网调试可以设为Debug等级）
 slogLevel=0
 

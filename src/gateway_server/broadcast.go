@@ -9,6 +9,7 @@ import (
 	"mixture/proto/mutual_json"
 	"mixture/proto/mutual_pb/pb"
 	"mixture/src/common/printer"
+	"mixture/src/common/profile_trace"
 	"strconv"
 	"strings"
 )
@@ -29,7 +30,7 @@ type BroadcastResult struct {
 func BroadcastToGateClients(sessionIDs string, protoNum uint16, payload []byte) BroadcastResult {
 	result := BroadcastResult{}
 	defer func() {
-		GatewayDropCounters.broadcastSend.Add(uint64(result.Dropped))
+		profile_trace.GatewayDropCounters.BroadcastSend.Add(uint64(result.Dropped))
 	}()
 	packetLen := SessionIdLen + ProtoNumLen + len(payload)
 	if packetLen > int(MaxPacketBodySize) {

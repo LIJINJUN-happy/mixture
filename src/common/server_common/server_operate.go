@@ -12,13 +12,13 @@ import (
 	"mixture/proto/interior_json"
 	"mixture/proto/interior_pb/ipb"
 	"mixture/src/common/printer"
+	"mixture/src/common/profile_trace"
 	"mixture/src/database"
 	"mixture/src/gateway_server"
 	"net"
 	"os"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -30,32 +30,6 @@ const (
 
 // 通用服务指针（创建服务器结构体对象后赋值其地址给该指针）
 var ServicePrt *ServerInfo
-
-// 后端服务进程自启动以来的累计消息丢弃统计。
-type ServerDropMetrics struct {
-	ReceiveQueueFull     uint64 `json:"receive_queue_full"`      //网关连接的接收处理队列已满
-	ProtocolQueueFull    uint64 `json:"protocol_queue_full"`     //协议目标模块的接收队列已满
-	AsyncModuleQueueFull uint64 `json:"async_module_queue_full"` //异步模块调用的目标队列已满
-	DeliverySend         uint64 `json:"delivery_send"`           //返回网关时目标连接不存在、已关闭或发送队列已满
-}
-
-// 该结构保存后端服务各类消息丢弃场景的原子累计值。
-var ServerDropCounters struct {
-	receiveQueueFull     atomic.Uint64
-	protocolQueueFull    atomic.Uint64
-	asyncModuleQueueFull atomic.Uint64
-	deliverySend         atomic.Uint64
-}
-
-// GetServerDropMetrics 返回当前后端服务丢弃计数的只读快照。
-func GetServerDropMetrics() ServerDropMetrics {
-	return ServerDropMetrics{
-		ReceiveQueueFull:     ServerDropCounters.receiveQueueFull.Load(),
-		ProtocolQueueFull:    ServerDropCounters.protocolQueueFull.Load(),
-		AsyncModuleQueueFull: ServerDropCounters.asyncModuleQueueFull.Load(),
-		DeliverySend:         ServerDropCounters.deliverySend.Load(),
-	}
-}
 
 // 服务结构体（包含服务定义的所有信息）
 type ServerInfo struct {
@@ -301,7 +275,7 @@ func (s *ServerInfo) BeginService(sCoon *SerConnObj) {
 				*bufPtr = (*bufPtr)[:packetLen]
 				copy(*bufPtr, sliceBuffer[idx:elementIDX])
 				if !sCoon.TryEnqueue(sCoon.receiveChannel, bufPtr) {
-					ServerDropCounters.receiveQueueFull.Add(1)
+					profile_trace.ServerDropCounters.ReceiveQueueFull.Add(1)
 					*bufPtr = (*bufPtr)[:cap(*bufPtr)]
 					ReceivePacketBufPool.Put(bufPtr)
 					printer.TextWarn("BeginService", "Err", "receiveChannel Full", "ServerName", s.ServerName, "ServerId", s.ServerId, "GateId", sCoon.GetGateId())
@@ -478,7 +452,7 @@ func TranspondProtoPack(data *[]byte, proName string, gateId int, sessionID uint
 		select {
 		case modChan <- info:
 		default:
-			ServerDropCounters.protocolQueueFull.Add(1)
+			profile_trace.ServerDropCounters.ProtocolQueueFull.Add(1)
 			*data = (*data)[:cap(*data)]
 			ReceivePacketBufPool.Put(data)
 			*info = ProtoPackInfo{}
@@ -535,7 +509,7 @@ func DeliveryMsg(gateID int, sessionId uint32, protoName string, data []byte) {
 			*bufPtr = sendDataBuf // 缩切到实际数据长度，接收端 *bufPtr 即为有效数据
 			//非阻塞写，避免 gateway 慢时阻塞模块协程
 			if !gateConn.TrySend(bufPtr) {
-				ServerDropCounters.deliverySend.Add(1)
+				profile_trace.ServerDropCounters.DeliverySend.Add(1)
 				printer.TextWarn("DeliveryMsg Connection Closed Or Queue Full, Drop msg", "GateID", gateID, "protoName", protoName, "sessionId", sessionId)
 				DeliveryMsgBufPool.Put(bufPtr)
 			}
@@ -544,7 +518,7 @@ func DeliveryMsg(gateID int, sessionId uint32, protoName string, data []byte) {
 			DeliveryMsgBufPool.Put(bufPtr)
 		}
 	} else {
-		ServerDropCounters.deliverySend.Add(1)
+		profile_trace.ServerDropCounters.DeliverySend.Add(1)
 		printer.TextError("GetConnObj Fail", "GateID", gateID)
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"mixture/src/common/printer"
+	"mixture/src/common/profile_trace"
 	"mixture/src/gateway_server"
 	"os"
 	"os/signal"
@@ -217,7 +218,7 @@ func SynchronousPack2Module(modName string, interfaceFuncName string, args []any
 			info.ArgsList = args
 			info.ReturnChan = returnChan
 			select {
-			case mod.receiptChan <- info: // 所有权已交给模块，此后不能再访问或回收info
+			case mod.receiptChan <- info: // 所有权已交给模块,此后不能再访问或回收info
 			case <-timer.C:
 				info.ArgsList = nil
 				info.ReturnChan = nil
@@ -253,7 +254,7 @@ func AsynchronousPack2Module(modName string, interfaceFuncName string, args []an
 			case mod.receiptChan <- info:
 				return true
 			default:
-				ServerDropCounters.asyncModuleQueueFull.Add(1)
+				profile_trace.ServerDropCounters.AsyncModuleQueueFull.Add(1)
 				*info = ModulePackInfo{}
 				ModulePackInfoPool.Put(info)
 				printer.TextWarn("AsynchronousPack2Module Queue Full", "ModName", modName, "CallFunc", interfaceFuncName)
@@ -265,4 +266,18 @@ func AsynchronousPack2Module(modName string, interfaceFuncName string, args []an
 		printer.TextError("AsynchronousPack2Module_modNameError", "ModName", modName)
 	}
 	return false
+}
+
+// 从并发安全的模块管理器读取队列，不遍历启动期间会写入的协议注册map。
+func GetModuleQueueMetrics() map[string]profile_trace.ModuleQueueMetrics {
+	queues := make(map[string]profile_trace.ModuleQueueMetrics)
+	ServerModMgr.Range(func(key, value any) bool {
+		name, nameOK := key.(string)
+		mod, modOK := value.(*ServerModule)
+		if nameOK && modOK && mod != nil {
+			queues[name] = profile_trace.ModuleQueueMetrics{Length: len(mod.receiptChan), Capacity: cap(mod.receiptChan)}
+		}
+		return true
+	})
+	return queues
 }

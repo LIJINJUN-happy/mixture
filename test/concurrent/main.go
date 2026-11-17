@@ -10,10 +10,13 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/gorilla/websocket"
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/proto"
 	"mixture/proto/mutual_pb/pb"
 )
@@ -73,10 +76,28 @@ func (s *counters) print(elapsed time.Duration, previous *int64) {
 	*previous = recv
 }
 
-func packet() ([]byte, error) {
+func packet(payloadBytes int) ([]byte, error) {
 	data, err := proto.Marshal(&pb.C2STest{Num: 1})
 	if err != nil {
 		return nil, err
+	}
+	if payloadBytes < len(data) || payloadBytes > 4092 {
+		return nil, errors.New("payload-bytes must be between 2 and 4092")
+	}
+	if payloadBytes > len(data) {
+		padding := -1
+		for n := 0; n <= payloadBytes; n++ {
+			if len(data)+protowire.SizeTag(127)+protowire.SizeBytes(n) == payloadBytes {
+				padding = n
+				break
+			}
+		}
+		if padding < 0 {
+			return nil, fmt.Errorf("payload size %d cannot be encoded exactly", payloadBytes)
+		}
+		//使用合法unknown字段增加请求大小，不修改正式protobuf定义或业务回包逻辑。
+		data = protowire.AppendTag(data, 127, protowire.BytesType)
+		data = protowire.AppendBytes(data, make([]byte, padding))
 	}
 	// 外层长度只计算包体；包体为 2 字节协议号 + protobuf 数据。
 	bodyLen := 2 + len(data)
@@ -127,9 +148,70 @@ func readReply(conn net.Conn) error {
 	return nil
 }
 
+// WebSocketStream 将二进制WS消息适配为现有压测工具的协议字节流；每连接仍只有一个读取者和写入者。
+type WebSocketStream struct {
+	*websocket.Conn
+	Reader io.Reader //当前WS消息中尚未消费的数据
+}
+
+func (c *WebSocketStream) Read(data []byte) (int, error) {
+	for {
+		if c.Reader == nil {
+			kind, reader, err := c.NextReader()
+			if err != nil {
+				return 0, err
+			}
+			if kind != websocket.BinaryMessage {
+				return 0, errors.New("expected binary WebSocket message")
+			}
+			c.Reader = reader
+		}
+		n, err := c.Reader.Read(data)
+		if err == io.EOF {
+			c.Reader = nil
+			if n > 0 {
+				return n, nil
+			}
+			continue
+		}
+		return n, err
+	}
+}
+
+func (c *WebSocketStream) Write(data []byte) (int, error) {
+	if err := c.WriteMessage(websocket.BinaryMessage, data); err != nil {
+		return 0, err
+	}
+	return len(data), nil
+}
+
+func (c *WebSocketStream) SetDeadline(deadline time.Time) error {
+	if err := c.SetReadDeadline(deadline); err != nil {
+		return err
+	}
+	return c.SetWriteDeadline(deadline)
+}
+
+// DialTarget 根据地址选择TCP或WS/WSS，复用相同的请求校验和计数逻辑。
+func DialTarget(address string, timeout time.Duration) (net.Conn, error) {
+	if strings.HasPrefix(address, "ws://") || strings.HasPrefix(address, "wss://") {
+		dialer := websocket.Dialer{HandshakeTimeout: timeout}
+		conn, response, err := dialer.Dial(address, nil)
+		if err != nil {
+			if response != nil && response.Body != nil {
+				response.Body.Close()
+			}
+			return nil, err
+		}
+		conn.SetReadLimit(4096)
+		return &WebSocketStream{Conn: conn}, nil
+	}
+	return net.DialTimeout("tcp", address, timeout)
+}
+
 func worker(ctx context.Context, address, mode string, interval, timeout, readDelay time.Duration, request []byte, s *counters, conns *sync.Map, wg *sync.WaitGroup) {
 	defer wg.Done()
-	conn, err := net.DialTimeout("tcp", address, timeout)
+	conn, err := DialTarget(address, timeout)
 	if err != nil {
 		s.dialFailed.Add(1)
 		return
@@ -146,13 +228,9 @@ func worker(ctx context.Context, address, mode string, interval, timeout, readDe
 	if mode == "connect" {
 		var one [1]byte
 		for ctx.Err() == nil {
-			conn.SetReadDeadline(time.Now().Add(time.Second))
+			//由主协程在测试结束时Close唤醒；WS读取超时后不可继续重试读取。
 			_, err := conn.Read(one[:])
 			if err != nil {
-				var ne net.Error
-				if errors.As(err, &ne) && ne.Timeout() {
-					continue
-				}
 				if ctx.Err() == nil {
 					s.failed.Add(1) // 服务端提前断开
 				}
@@ -213,7 +291,8 @@ func worker(ctx context.Context, address, mode string, interval, timeout, readDe
 }
 
 func main() {
-	address := flag.String("addr", "127.0.0.1:10230", "TCP 网关地址")
+	address := flag.String("addr", "127.0.0.1:10230", "TCP地址或ws://host:port/ws、wss://host:port/ws")
+	payloadBytes := flag.Int("payload-bytes", 2, "protobuf请求数据字节数，最大4092；不改变服务端回包大小")
 	mode := flag.String("mode", "echo", "connect=只保持连接；echo=校验回显；noread=发送但不读回包")
 	count := flag.Int("connections", 100, "目标并发连接数")
 	rate := flag.Int("ramp", 100, "每秒创建的连接数")
@@ -226,12 +305,12 @@ func main() {
 		fmt.Fprintln(os.Stderr, "参数无效；使用 -h 查看说明")
 		os.Exit(2)
 	}
-	request, err := packet()
+	request, err := packet(*payloadBytes)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
-	fmt.Printf("目标=%s 模式=%s 连接数=%d 建连速率=%d/s 持续=%s\n", *address, *mode, *count, *rate, *duration)
+	fmt.Printf("目标=%s 模式=%s 连接数=%d 建连速率=%d/s 持续=%s 请求数据=%dB\n", *address, *mode, *count, *rate, *duration, *payloadBytes)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	var s counters

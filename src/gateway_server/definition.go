@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"mixture/src/common/printer"
+	"mixture/src/common/profile_trace"
 	"mixture/src/database"
 	"net"
 	"net/http"
@@ -47,29 +48,6 @@ const (
 type CutIndexList struct {
 	data [MaxPacketsPerRead]int
 	len  int
-}
-
-// 网关进程自启动以来的累计消息丢弃统计。
-type GatewayDropMetrics struct {
-	LinkerQueueFull uint64 `json:"linker_queue_full"` //发往后端服务的 Linker 队列已满
-	ClientSend      uint64 `json:"client_send"`       //目标客户端不存在、已关闭或写队列已满
-	BroadcastSend   uint64 `json:"broadcast_send"`    //广播目标不存在、已关闭、写队列已满或广播包过大
-}
-
-// 该结构保存网关各类消息丢弃场景的原子累计值。
-var GatewayDropCounters struct {
-	linkerQueueFull atomic.Uint64
-	clientSend      atomic.Uint64
-	broadcastSend   atomic.Uint64
-}
-
-// GetGatewayDropMetrics 返回当前网关丢弃计数的只读快照。
-func GetGatewayDropMetrics() GatewayDropMetrics {
-	return GatewayDropMetrics{
-		LinkerQueueFull: GatewayDropCounters.linkerQueueFull.Load(),
-		ClientSend:      GatewayDropCounters.clientSend.Load(),
-		BroadcastSend:   GatewayDropCounters.broadcastSend.Load(),
-	}
 }
 
 // 白名单指针对象
@@ -471,4 +449,25 @@ func (c *CutIndexList) Get(i int) int {
 
 func (c *CutIndexList) Len() int {
 	return c.len
+}
+
+// 读取并发安全映射中已初始化的连接，不访问启动期间变化的Linker配置。
+func GetGatewayWriteQueueMetrics() profile_trace.GatewayWriteQueueMetrics {
+	var metrics profile_trace.GatewayWriteQueueMetrics
+	GateClientMap.Range(func(_, value any) bool {
+		session, ok := value.(*clientSession)
+		if !ok || session == nil || session.connection == nil {
+			return true
+		}
+		queue := session.connection.writeChan //连接入map前完成初始化,之后不替换该队列
+		length := len(queue)
+		metrics.Clients++
+		metrics.Length += length
+		metrics.Capacity += cap(queue)
+		if length > metrics.MaxLength {
+			metrics.MaxLength = length
+		}
+		return true
+	})
+	return metrics
 }

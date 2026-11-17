@@ -937,7 +937,10 @@
   <div class="info">
     <b>观测入口：</b>开启配置 <code>pprof=true</code> 时，主程序在数据库配置的调试端口提供
     <code>/debug/pprof/</code> 和 JSON <code>/metrics</code>；WS 业务端口不继承这些路由。
-    metrics 包含采样时间、goroutine 数量、<code>gateway_drops</code> 与 <code>server_drops</code>。<br/>
+    默认监听 <code>127.0.0.1</code>，可用 <code>debugListenAddress</code> 显式调整；端口来自各服务的 <code>deBugModePort</code>。
+    metrics 包含进程/构建版本、运行时间、goroutine、堆、累计分配与GC、<code>module_queues</code>、在线客户端数、
+    <code>gateway_write_queues</code>、<code>gateway_drops</code> 与 <code>server_drops</code>。<br/>
+    指标结构、丢包计数器及诊断路由集中在 <code>src/common/profile_trace/trace.go</code>；网关与后端保留私有队列的只读采样函数，由主程序通过回调接入，避免循环依赖。<br/>
     <b>计数范围：</b>网关统计 Linker 队列满、客户端投递失败及广播投递失败；后端统计连接接收队列满、协议模块队列满、异步模块队列满及返回网关投递失败。
     这些是进程启动以来的累计值，不是覆盖所有原因的端到端丢包统计。<br/>
     <b>错误分类：</b><code>CheckIsReadTimeOut</code> 使用 <code>errors.As</code> 找到 net.Error 并检查 Timeout()，普通网络错误不会仅因实现了 net.Error 就被记成超时。<br/>
