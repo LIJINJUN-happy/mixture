@@ -14,12 +14,12 @@ import (
 	"time"
 )
 
-var mongoOpTimeout = 5 * time.Second
-var writeMongoClient atomic.Pointer[mongo.Client]
-var readMongoClient atomic.Pointer[mongo.Client]
-var maxPoolSize, minPoolSize = uint64(100), uint64(10)
-var readClientOptions, writeClientOptions *options.ClientOptions = nil, nil
-var mongoReadDBAddr, mongoReadDBPort, mongoWriteDBAddr, mongoWriteDBPort string
+var mongoOpTimeout = 5 * time.Second                                            //单次Mongo业务操作的超时时长
+var writeMongoClient atomic.Pointer[mongo.Client]                               //写客户端的原子指针，供业务读取及健康检查替换
+var readMongoClient atomic.Pointer[mongo.Client]                                //读客户端的原子指针，供业务读取及健康检查替换
+var maxPoolSize, minPoolSize = uint64(100), uint64(10)                          //每个客户端在每台Mongo服务器上的连接池最大、最小连接数
+var readClientOptions, writeClientOptions *options.ClientOptions = nil, nil     //读、写客户端的连接配置，用于初始化及故障重建
+var mongoReadDBAddr, mongoReadDBPort, mongoWriteDBAddr, mongoWriteDBPort string //从SQLite读取的读库地址、读库端口、写库地址、写库端口
 
 const (
 	MongoConnectTimeout    = 10 * time.Second //创建Mongo客户端的最长等待时间
@@ -206,7 +206,7 @@ func MongoFindOne(fileDBName, collectionName string, searchInterface interface{}
 		return nil, errors.New("MongoFindOne: read client is nil")
 	}
 
-	var singleResult bson.M
+	var singleResult bson.M //单条查询结果，按字段名保存解码后的文档内容
 	ctx, cancel := context.WithTimeout(context.Background(), mongoOpTimeout)
 	defer cancel()
 
@@ -329,7 +329,7 @@ func MongoFind(fileDBName, collectionName string, filter interface{}, limit, ski
 	}
 	defer cursor.Close(ctx)
 
-	var results []bson.M
+	var results []bson.M //多条查询结果，保存游标解码后的文档列表
 	if err = cursor.All(ctx, &results); err != nil {
 		return nil, fmt.Errorf("MongoFind %s.%s cursor.All: %w", fileDBName, collectionName, err)
 	}
