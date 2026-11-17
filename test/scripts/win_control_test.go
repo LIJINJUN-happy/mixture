@@ -23,7 +23,7 @@ func TestWindowsControlScripts(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, name := range []string{"stop.bat", "kill.bat"} {
+	for _, name := range []string{"stop.bat", "kill.bat", "logrm.bat"} {
 		data, err := os.ReadFile(filepath.Join("..", "..", "script", "win", name))
 		if err != nil {
 			t.Fatal(err)
@@ -115,6 +115,9 @@ func main() {
 	run("kill.bat", true, "Nothing to kill")
 	done, clean := start(exe, "handle", 0x10)
 	second, secondClean := start(exe, "handle", 0x10)
+	run("logrm.bat", false, "Project server is running")
+	alive(done)
+	alive(second)
 	run("stop.bat", true, "Close Success")
 	select {
 	case <-done:
@@ -149,4 +152,70 @@ func main() {
 	run("kill.bat", true, "forcefully terminated")
 	<-done
 	alive(other)
+}
+
+func TestWindowsLogRemoval(t *testing.T) {
+	// Both project and caller paths include spaces; the caller's log must survive.
+	root := t.TempDir()
+	project := filepath.Join(root, "project with spaces")
+	scriptDir := filepath.Join(project, "script", "win")
+	caller := filepath.Join(root, "unrelated caller")
+	logDir := filepath.Join(project, "log")
+	for _, dir := range []string{scriptDir, caller, filepath.Join(logDir, "moduleLog")} {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	data, err := os.ReadFile(filepath.Join("..", "..", "script", "win", "logrm.bat"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := filepath.Join(scriptDir, "logrm.bat")
+	if err := os.WriteFile(script, data, 0644); err != nil {
+		t.Fatal(err)
+	}
+	protected := filepath.Join(caller, "keep.log")
+	for _, name := range []string{protected, filepath.Join(logDir, "server.log"), filepath.Join(logDir, "moduleLog", "user.log_2026-11-18")} {
+		if err := os.WriteFile(name, []byte("test"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	run := func(wantOK bool, contains string) {
+		t.Helper()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(ctx, "cmd.exe", "/d", "/c", "call", script, "--no-pause")
+		cmd.Dir = caller
+		out, err := cmd.CombinedOutput()
+		t.Logf("logrm.bat: %s", out)
+		if (err == nil) != wantOK || !strings.Contains(string(out), contains) {
+			t.Fatalf("err=%v, output=%s", err, out)
+		}
+	}
+	run(true, "Clean Success")
+	if _, err := os.Stat(logDir); !os.IsNotExist(err) {
+		t.Fatal("entire log directory was not removed:", err)
+	}
+	if _, err := os.Stat(protected); err != nil {
+		t.Fatal("unrelated log affected:", err)
+	}
+	run(true, "Nothing to delete")
+	// A junction inside log must be rejected without touching its external target.
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	junction := filepath.Join(logDir, "linked logs")
+	cmd := exec.Command("cmd.exe", "/d", "/c", "mklink", "/J", junction, caller)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("create test junction: %v, %s", err, out)
+	}
+	// Remove only the junction, not its target, even if a subsequent assertion fails.
+	t.Cleanup(func() { _ = os.Remove(junction) })
+	run(false, "Link/junction detected")
+	if _, err := os.Stat(protected); err != nil {
+		t.Fatal("junction target affected:", err)
+	}
+	if _, err := os.Stat(logDir); err != nil {
+		t.Fatal("unsafe log directory should have been preserved:", err)
+	}
 }
