@@ -23,10 +23,9 @@ import (
 )
 
 const (
-	sendChannelSize               = 1024
-	receiveChannelSize            = 1024
-	TransmitDisposeTickerDuration = time.Millisecond * 500
-	GateHandshakeTimeout          = 10 * time.Second //网关连接后完成身份握手的最长等待时间
+	sendChannelSize      = 1024             //单个网关连接向网关发送消息的缓冲队列容量
+	receiveChannelSize   = 1024             //单个网关连接接收并等待处理消息的缓冲队列容量
+	GateHandshakeTimeout = 10 * time.Second //网关连接后完成身份握手的最长等待时间
 )
 
 // 通用服务指针（创建服务器结构体对象后赋值其地址给该指针）
