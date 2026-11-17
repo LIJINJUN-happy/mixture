@@ -301,7 +301,7 @@ func run() error {
 	hot := measure(prefix+"hot", *workers, *workers, *delay, payload)
 	hot.print("02 热点 key 失效，同批并发访问")
 	if hot.loads.Load() > 1 {
-		fmt.Println("观察：同一个 key 发生重复回源；当前封装没有合并这些并发加载。")
+		fmt.Println("观察：热点key发生多次回源，请检查缓存写入失败、驱逐或过期。")
 	}
 
 	e.breakConnections()
@@ -312,12 +312,12 @@ func run() error {
 	}
 	down := measure(prefix+"down", *workers, *requests, *delay, payload)
 	down.print("03 缓存不可用，模拟数据库回源")
-	fmt.Println("说明：业务成功可能来自回源，不能据此认定缓存可用；请求延迟不包含异步回写完成时间。")
+	fmt.Println("说明：业务成功可能来自回源，不能据此认定缓存可用；请求延迟包含同步回写等待。同key并发回源峰值应为1。")
 	fmt.Println("测试 key 不执行全库清理，真实缓存中的测试数据按框架 15 分钟 TTL 过期。")
-	if hit.failed.Load()+hot.failed.Load()+down.failed.Load() != 0 || hit.loads.Load() != 0 || hot.loads.Load() == 0 || down.loads.Load() != int64(*requests) {
+	if hit.failed.Load()+hot.failed.Load()+down.failed.Load() != 0 || hit.loads.Load() != 0 || hot.loads.Load() != 1 || down.loads.Load() == 0 || down.peakLoads.Load() != 1 {
 		return fmt.Errorf("结果不符合当前封装预期，请查看统计及日志（真实节点驱逐也会导致命中场景回源）")
 	}
-	fmt.Println("PASS：三个场景的数据及故障注入检查通过；热点重复回源、故障回源放大属于观察结果，不代表已解决。")
+	fmt.Println("PASS：数据及故障注入检查通过，热点回源一次，缓存故障时同key回源并发峰值为1；合并范围仅限本进程。")
 	return nil
 }
 

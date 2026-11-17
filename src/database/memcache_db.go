@@ -1,9 +1,11 @@
 package database
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/bradfitz/gomemcache/memcache"
+	"golang.org/x/sync/singleflight"
 	"mixture/src/common/printer"
 	"sync/atomic"
 	"time"
@@ -14,8 +16,9 @@ var (
 	cache               atomic.Pointer[memcache.Client]
 	cacheDBAddr         string
 	cacheDBPort         string
-	cacheItemExpiration int32 = 60 * 15                //CacheItem 有效时长（单位：秒）
-	cacheTimeOut              = 500 * time.Millisecond //操作超时时长
+	cacheItemExpiration int32              = 60 * 15                //CacheItem 有效时长（单位：秒）
+	cacheTimeOut                           = 500 * time.Millisecond //操作超时时长
+	MemCacheLoadGroup   singleflight.Group                          //合并本进程内同一key的并发回源，避免热点失效时重复查询数据库
 )
 
 func MemCacheConnectClientInit(serName, processId string) {
@@ -164,26 +167,36 @@ func MemCacheBatchSet(kvMap map[string][]byte) []string {
 	return failedKeys
 }
 
-// MemCacheGetOrLoad 缓存穿透保护：先查缓存，miss时执行loader并回写
-// 使用场景：自动处理"先查缓存，miss再查DB"的逻辑
+// MemCacheGetOrLoad 先查缓存，未命中或缓存故障时合并本进程内同一key的并发加载。
+// 同一key必须对应相同的数据及loader语义，loader不能递归调用本函数加载同一key。
+// 回写完成后释放合并任务；回写失败仍返回加载结果，每个调用者获得独立的字节切片。
 func MemCacheGetOrLoad(key string, loader func() ([]byte, error)) ([]byte, error) {
 	// 先查缓存
 	if val, err := MemCacheCmd("GET", key, nil); err == nil {
 		return []byte(val), nil
 	}
 
-	// 缓存miss，执行loader
-	data, err := loader()
+	data, err, _ := MemCacheLoadGroup.Do(key, func() (interface{}, error) {
+		// 进入合并任务后再次检查，避免之前的任务已回写缓存却仍重复回源。
+		if val, err := MemCacheCmd("GET", key, nil); err == nil {
+			return []byte(val), nil
+		}
+		if loader == nil {
+			return nil, errors.New("MemCacheGetOrLoad: loader is nil")
+		}
+		loaded, err := loader()
+		if err != nil {
+			return nil, err
+		}
+		loaded = bytes.Clone(loaded)
+		// 在释放合并任务前回写，防止异步回写期间再次启动同key的加载。
+		if _, setErr := MemCacheCmd("SET", key, loaded); setErr != nil {
+			printer.TextWarn("MemCacheGetOrLoad", "SetCache failed", setErr.Error())
+		}
+		return loaded, nil
+	})
 	if err != nil {
 		return nil, err
 	}
-
-	// 回写缓存（异步，不阻塞）
-	go func(k string, d []byte) {
-		if _, setErr := MemCacheCmd("SET", k, d); setErr != nil {
-			printer.TextWarn("MemCacheGetOrLoad", "SetCache failed", setErr.Error())
-		}
-	}(key, data)
-
-	return data, nil
+	return bytes.Clone(data.([]byte)), nil
 }
