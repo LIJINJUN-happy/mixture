@@ -21,6 +21,14 @@ var (
 	InterfaceName2ModMap = make(map[string]chan interface{}) //外部接口模块映射表（key:外部接口名,val:模块通道chan）
 )
 
+// 同步模块调用错误，可通过errors.Is判断具体原因。
+var (
+	ErrModuleNotFound       = errors.New("Module Not Found")       //目标模块不存在
+	ErrInvalidModule        = errors.New("Invalid Module")         //模块管理器中的值类型不正确或为空
+	ErrModuleEnqueueTimeout = errors.New("Module Enqueue Timeout") //入队超时，任务未交给模块
+	ErrModuleResultTimeout  = errors.New("Module Result Timeout")  //等待结果超时，任务已入队且可能继续执行
+)
+
 // 服务模块
 type ServerModule struct {
 	modName          string                                                     //模块名称
@@ -204,10 +212,11 @@ func (mod *ServerModule) RegisterInterfaceHandleCaller(interfaceName string, int
 	mod.InterfaceFuncMap[interfaceName] = interfaceHandleFunction
 }
 
-// 打包模块调用数据“同步”到对应的模块通道并等待返回结果
-func SynchronousPack2Module(modName string, interfaceFuncName string, args []any) interface{} {
+// SynchronousPack2Module 同步投递并等待模块返回；成功时结果允许为nil。
+// 入队超时表示任务未投递；结果超时仅表示未及时收到结果，已入队的任务不会被取消，可能继续执行。
+func SynchronousPack2Module(modName string, interfaceFuncName string, args []any) (interface{}, error) {
 	if sm, ok := ServerModMgr.Load(modName); ok {
-		if mod, res := sm.(*ServerModule); res {
+		if mod, res := sm.(*ServerModule); res && mod != nil {
 			timer := time.NewTimer(ModCallerTimeOut) // 入队和等待结果共用一个超时预算。
 			defer timer.Stop()
 			returnChan := make(chan interface{}, 1)
@@ -224,22 +233,23 @@ func SynchronousPack2Module(modName string, interfaceFuncName string, args []any
 				info.ReturnChan = nil
 				ModulePackInfoPool.Put(info)
 				printer.TextError("SynchronousPack2Module_EnqueueTimeOut", "ModName", modName, "CallFunc", interfaceFuncName)
-				return nil
+				return nil, fmt.Errorf("module=%s interface=%s: %w", modName, interfaceFuncName, ErrModuleEnqueueTimeout)
 			}
 
 			//开始等待同步调用的数据返回
 			select {
 			case retData := <-returnChan:
-				return retData
+				return retData, nil
 			case <-timer.C:
 				printer.TextError("SynchronousPack2Module_TimeOut", "ModName", modName, "CallFunc", interfaceFuncName, "CallArgs", args)
-				return nil
+				return nil, fmt.Errorf("module=%s interface=%s: %w", modName, interfaceFuncName, ErrModuleResultTimeout)
 			}
 		}
+		return nil, fmt.Errorf("module=%s: %w", modName, ErrInvalidModule)
 	} else {
 		printer.TextError("SynchronousPack2Module_modNameError", "ModName", modName)
+		return nil, fmt.Errorf("module=%s: %w", modName, ErrModuleNotFound)
 	}
-	return nil
 }
 
 // 打包模块调用数据“异步”到对应的模块通道;true仅表示已入队，false表示未投递，调用方可处理失败。

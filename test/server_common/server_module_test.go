@@ -393,8 +393,8 @@ func TestSynchronousModuleCall(t *testing.T) {
 		sc.ModCallerTimeOut = time.Second
 		withModule(t, "fast", 1, func(args ...any) interface{} { return args[0] }, func() {
 			for i := 0; i < 1000; i++ {
-				if got := sc.SynchronousPack2Module("fast", "echo", []any{i}); got != i {
-					t.Fatalf("got %v, want %d", got, i)
+				if got, err := sc.SynchronousPack2Module("fast", "echo", []any{i}); err != nil || got != i {
+					t.Fatalf("got %v, err %v, want %d", got, err, i)
 				}
 			}
 		})
@@ -431,12 +431,12 @@ func TestSynchronousModuleCall(t *testing.T) {
 			case <-time.After(time.Second):
 				t.Fatal("protocol enqueue blocked")
 			}
-			done := make(chan interface{}, 1)
-			go func() { done <- sc.SynchronousPack2Module("full", "echo", nil) }()
+			done := make(chan error, 1)
+			go func() { _, err := sc.SynchronousPack2Module("full", "echo", nil); done <- err }()
 			select {
-			case got := <-done:
-				if got != nil {
-					t.Fatalf("got %v, want nil", got)
+			case err := <-done:
+				if !errors.Is(err, sc.ErrModuleEnqueueTimeout) {
+					t.Fatalf("got %v, want enqueue timeout", err)
 				}
 			case <-time.After(time.Second):
 				t.Fatal("call remained blocked on enqueue")
@@ -448,13 +448,42 @@ func TestSynchronousModuleCall(t *testing.T) {
 	})
 	t.Run("late reply does not block module", func(t *testing.T) {
 		sc.ModCallerTimeOut = 20 * time.Millisecond
-		release := make(chan struct{})
-		withModule(t, "late", 1, func(...any) interface{} { <-release; return 42 }, func() {
-			defer close(release)
-			if got := sc.SynchronousPack2Module("late", "echo", nil); got != nil {
-				t.Fatalf("got %v, want timeout", got)
+		release, finished := make(chan struct{}), make(chan struct{})
+		var releaseOnce sync.Once
+		releaseTask := func() { releaseOnce.Do(func() { close(release) }) }
+		withModule(t, "late", 1, func(...any) interface{} { <-release; close(finished); return 42 }, func() {
+			defer releaseTask()
+			if got, err := sc.SynchronousPack2Module("late", "echo", nil); got != nil || !errors.Is(err, sc.ErrModuleResultTimeout) {
+				t.Fatalf("got %v, err %v, want result timeout", got, err)
+			}
+			releaseTask()
+			select {
+			case <-finished:
+			case <-time.After(time.Second):
+				t.Fatal("timed-out task did not continue")
 			}
 		})
+	})
+	t.Run("nil result is successful", func(t *testing.T) {
+		sc.ModCallerTimeOut = time.Second
+		withModule(t, "nil-result", 1, func(...any) interface{} { return nil }, func() {
+			got, err := sc.SynchronousPack2Module("nil-result", "echo", nil)
+			if got != nil || err != nil {
+				t.Fatalf("got %v, err %v, want nil result and nil error", got, err)
+			}
+		})
+	})
+	t.Run("missing and invalid module", func(t *testing.T) {
+		if _, err := sc.SynchronousPack2Module("missing-test", "echo", nil); !errors.Is(err, sc.ErrModuleNotFound) {
+			t.Fatalf("got %v, want module not found", err)
+		}
+		for _, value := range []any{"invalid", (*sc.ServerModule)(nil)} {
+			sc.ServerModMgr.Store("invalid-test", value)
+			if _, err := sc.SynchronousPack2Module("invalid-test", "echo", nil); !errors.Is(err, sc.ErrInvalidModule) {
+				t.Fatalf("got %v, want invalid module", err)
+			}
+		}
+		sc.ServerModMgr.Delete("invalid-test")
 	})
 }
 
