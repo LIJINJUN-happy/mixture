@@ -132,33 +132,33 @@ func NewDebugMux(serName, processID string, sources TraceSources) *http.ServeMux
 
 		// total_alloc、mallocs、frees及GC总量为进程累计值，计算速率需取两次采样的差值。
 		metrics := map[string]any{
-			"time":                 time.Now(),
-			"server_name":          serName,
-			"server_id":            processID,
-			"pid":                  os.Getpid(),
-			"started_at":           ProcessStartTime,
-			"uptime_seconds":       time.Since(ProcessStartTime).Seconds(),
-			"build_revision":       revision,
-			"build_modified":       modified,
-			"go_version":           runtime.Version(),
-			"goos":                 runtime.GOOS,
-			"goarch":               runtime.GOARCH,
-			"gomaxprocs":           runtime.GOMAXPROCS(0),
-			"goroutines":           runtime.NumGoroutine(),
-			"heap_alloc":           memory.HeapAlloc,
-			"heap_inuse":           memory.HeapInuse,
-			"heap_sys":             memory.HeapSys,
-			"total_alloc":          memory.TotalAlloc,
-			"mallocs":              memory.Mallocs,
-			"frees":                memory.Frees,
-			"num_gc":               memory.NumGC,
-			"gc_pause_ns":          memory.PauseTotalNs,
-			"gc_cpu_fraction":      memory.GCCPUFraction,
-			"module_queues":        queues,
-			"gateway_clients":      clients,
-			"gateway_write_queues": writeQueues,
-			"gateway_drops":        GetGatewayDropMetrics(),
-			"server_drops":         GetServerDropMetrics(),
+			"time":                 time.Now(),                             //本次响应生成时间，JSON包含时区；各项指标并非同一时刻的原子快照
+			"server_name":          serName,                                //服务类型名称，例如gateway_server、actor_server
+			"server_id":            processID,                              //启动参数指定的服务实例ID，区别于操作系统进程PID
+			"pid":                  os.Getpid(),                            //当前操作系统进程ID，采集时结合启动时间识别进程重启
+			"started_at":           ProcessStartTime,                       //本进程观测包初始化时记录的启动时间，不代表业务就绪时间
+			"uptime_seconds":       time.Since(ProcessStartTime).Seconds(), //自上述启动时间起经过的秒数，包含小数部分
+			"build_revision":       revision,                               //构建版本：优先使用注入值，其次VCS提交号，无法获取时为unknown
+			"build_modified":       modified,                               //Go构建信息记录的工作区修改标记；缺少记录时为false，不表示运行时状态
+			"go_version":           runtime.Version(),                      //构建当前程序使用的Go工具链版本
+			"goos":                 runtime.GOOS,                           //编译目标操作系统，例如linux、windows
+			"goarch":               runtime.GOARCH,                         //编译目标CPU架构，例如amd64、arm64
+			"gomaxprocs":           runtime.GOMAXPROCS(0),                  //当前允许同时执行Go代码的最大CPU数，不等于已核实的机器核数或CPU配额
+			"goroutines":           runtime.NumGoroutine(),                 //采样时当前进程的goroutine数量，包含业务、后台任务及诊断请求
+			"heap_alloc":           memory.HeapAlloc,                       //当前已分配堆对象的字节数，包含尚未被GC回收的不可达对象
+			"heap_inuse":           memory.HeapInuse,                       //当前用于堆对象的span字节数，包含span内未使用空间
+			"heap_sys":             memory.HeapSys,                         //Go堆从操作系统取得的地址空间字节数，不等于进程RSS或当前对象大小
+			"total_alloc":          memory.TotalAlloc,                      //进程启动以来累计分配的堆对象字节数，释放内存不会使其下降
+			"mallocs":              memory.Mallocs,                         //进程启动以来累计分配的堆对象数量，不是字节数
+			"frees":                memory.Frees,                           //进程启动以来累计释放的堆对象数量，不是字节数
+			"num_gc":               memory.NumGC,                           //进程启动以来已完成的GC周期累计次数
+			"gc_pause_ns":          memory.PauseTotalNs,                    //进程启动以来GC暂停的累计纳秒数，不是最近一次暂停或延迟分位值
+			"gc_cpu_fraction":      memory.GCCPUFraction,                   //进程运行以来GC占可用CPU时间的比例，0.01表示1%，不是当前CPU使用率
+			"module_queues":        queues,                                 //按模块名保存队列瞬时长度与容量，单位为消息条数，不包含正在处理的消息
+			"gateway_clients":      clients,                                //采样时网关已注册的在线客户端数，不包含尚未注册的预留连接名额
+			"gateway_write_queues": writeQueues,                            //客户端写队列的瞬时汇总：连接数、总长度、最大单队列长度及总容量
+			"gateway_drops":        GetGatewayDropMetrics(),                //网关自启动以来各类投递丢弃累计值，包含关闭等失败场景，不等于网络丢包率
+			"server_drops":         GetServerDropMetrics(),                 //后端自启动以来各类队列或投递失败累计值，计算窗口增量时需确认进程未重启
 		}
 		if err := json.NewEncoder(w).Encode(metrics); err != nil {
 			printer.TextError("Encode metrics failed", "err", err)
@@ -166,10 +166,10 @@ func NewDebugMux(serName, processID string, sources TraceSources) *http.ServeMux
 	})
 
 	// Index同时处理heap、goroutine等命名profile,CPU采样与执行跟踪使用专用处理器。
-	mux.HandleFunc("/debug/pprof/", pprof.Index)
-	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
-	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
-	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
-	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+	mux.HandleFunc("/debug/pprof/", pprof.Index)          //诊断索引及命名profile入口，例如heap查看堆分配、goroutine查看协程堆栈
+	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline) //返回当前进程的启动命令行，各参数以NUL字节分隔
+	mux.HandleFunc("/debug/pprof/profile", pprof.Profile) //采集CPU profile，用于定位CPU热点；seconds参数指定采样秒数，默认30秒
+	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)   //将程序计数器地址解析为函数名，供性能分析工具进行符号解析
+	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)     //采集Go执行跟踪，分析协程调度、阻塞及GC等事件；seconds参数指定时长，默认1秒
 	return mux
 }
