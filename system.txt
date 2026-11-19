@@ -17,7 +17,7 @@ streamBufferDealWay=1
 protocolType=protobuf
 
 --白名单初始列表（ip1|ip2|ip3|.....）
-whiteIPList=127.0.0.1|192.168.0.1
+whiteIPList=127.0.0.1|192.168.0.1|0.0.0.0
 
 --白名单默认状态（开服后默认开启还是不开启）
 whiteIPListDefaultStatus=false
